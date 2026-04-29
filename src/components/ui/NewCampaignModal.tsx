@@ -38,7 +38,7 @@ export default function NewCampaignModal({ open, onClose, view }: Props) {
   if (!open) return null
 
   const labels: Record<ViewName, string> = {
-    campaigns: 'New Campaign', calendar: 'New Social Post',
+    tasks: 'New Task', calendar: 'New Social Post',
     briefs: 'New Brief', performance: 'Log Campaign',
     approvals: 'New Approval', dev: 'New Dev Task',
   }
