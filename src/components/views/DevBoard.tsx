@@ -1,12 +1,12 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { supabase, type DevTask } from '@/lib/supabase'
 
 const COLS = [
-  { key:'backlog',  label:'Backlog',    color:'#4a4168' },
-  { key:'in_dev',   label:'In Dev',     color:'#f59e0b' },
+  { key:'backlog',  label:'Backlog',     color:'#4a4168' },
+  { key:'in_dev',   label:'In Dev',      color:'#f59e0b' },
   { key:'qa',       label:'QA / Testing',color:'#3b82f6' },
-  { key:'deployed', label:'Deployed',   color:'#22c55e' },
+  { key:'deployed', label:'Deployed',    color:'#22c55e' },
 ]
 const TYPE_COLORS: Record<string, string> = {
   frontend:'#06b6d4', backend:'#ef4444', qa:'#3b82f6', devops:'#f59e0b', design:'#a855f7',
@@ -16,27 +16,30 @@ export default function DevBoard({ brandId }: { brandId: string }) {
   const [tasks, setTasks] = useState<DevTask[]>([])
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
+  const loadTasks = useCallback(async () => {
     setLoading(true)
-    let q = supabase.from('dev_tasks').select('*, brands(name,color)').order('created_at', { ascending:false })
+    let q = supabase.from('dev_tasks').select('*, brands(name,color)').order('created_at', { ascending: false })
     if (brandId) q = q.eq('brand_id', brandId)
-    q.then(({ data }) => { setTasks(data || []); setLoading(false) })
-
-    const sub = supabase.channel('dev_tasks').on('postgres_changes', { event:'*', schema:'public', table:'dev_tasks' }, () => {
-      let q2 = supabase.from('dev_tasks').select('*, brands(name,color)').order('created_at', { ascending:false })
-      if (brandId) q2 = q2.eq('brand_id', brandId)
-      q2.then(({ data }) => setTasks(data || []))
-    }).subscribe()
-    return () => { supabase.removeChannel(sub) }
+    const { data } = await q
+    setTasks(data || [])
+    setLoading(false)
   }, [brandId])
+
+  useEffect(() => {
+    loadTasks()
+    const sub = supabase.channel('dev_tasks')
+      .on('postgres_changes', { event:'*', schema:'public', table:'dev_tasks' }, loadTasks)
+      .subscribe()
+    return () => { supabase.removeChannel(sub) }
+  }, [loadTasks])
 
   const move = async (id: string, status: string) => {
     await supabase.from('dev_tasks').update({ status }).eq('id', id)
   }
 
   const sprints = [...new Set(tasks.map(t => t.sprint_name).filter(Boolean))]
-  const activeSprint = sprints[0] || 'No Sprint'
-  const sprintTasks = tasks.filter(t => t.sprint_name === activeSprint)
+  const activeSprint = sprints[0] || null
+  const sprintTasks = activeSprint ? tasks.filter(t => t.sprint_name === activeSprint) : []
   const doneInSprint = sprintTasks.filter(t => t.status === 'deployed').length
   const progress = sprintTasks.length ? Math.round((doneInSprint / sprintTasks.length) * 100) : 0
 
@@ -44,8 +47,7 @@ export default function DevBoard({ brandId }: { brandId: string }) {
 
   return (
     <div>
-      {/* Sprint banner */}
-      {activeSprint !== 'No Sprint' && (
+      {activeSprint && (
         <div style={{ background:'var(--bg-elevated)', border:'0.5px solid var(--border-default)', borderRadius:'var(--radius-md)', padding:'14px 18px', marginBottom:18, display:'flex', alignItems:'center', gap:16 }}>
           <div>
             <div style={{ fontSize:10, color:'var(--text-muted)', textTransform:'uppercase', letterSpacing:'0.1em', marginBottom:2 }}>Current Sprint</div>
@@ -71,19 +73,13 @@ export default function DevBoard({ brandId }: { brandId: string }) {
           const cards = tasks.filter(t => t.status === col.key)
           return (
             <div key={col.key}>
-              <div style={{ display:'flex', alignItems:'center', gap:7, marginBottom:10, padding:'0 2px' }}>
+              <div style={{ display:'flex', alignItems:'center', gap:7, marginBottom:10 }}>
                 <div style={{ width:8, height:8, borderRadius:'50%', background: col.color }} />
                 <div style={{ fontSize:11, fontWeight:600, color:'var(--text-secondary)', textTransform:'uppercase', letterSpacing:'0.09em' }}>{col.label}</div>
                 <div style={{ marginLeft:'auto', fontSize:10, color:'var(--text-muted)', fontFamily:'monospace' }}>{cards.length}</div>
               </div>
-
               {cards.map(t => (
-                <div key={t.id} style={{
-                  background:'var(--bg-surface)', border:'0.5px solid var(--border-subtle)',
-                  borderRadius:'var(--radius-md)', padding:14, marginBottom:10, cursor:'pointer',
-                  position:'relative', overflow:'hidden',
-                  transition:'all 0.25s cubic-bezier(0.4,0,0.2,1)',
-                }}
+                <div key={t.id} style={{ background:'var(--bg-surface)', border:'0.5px solid var(--border-subtle)', borderRadius:'var(--radius-md)', padding:14, marginBottom:10, cursor:'pointer', position:'relative', overflow:'hidden', transition:'all 0.25s cubic-bezier(0.4,0,0.2,1)' }}
                   onMouseEnter={e => { const el = e.currentTarget as HTMLDivElement; el.style.borderColor='var(--border-default)'; el.style.transform='translateY(-3px)'; el.style.boxShadow='0 12px 36px rgba(0,0,0,0.5)' }}
                   onMouseLeave={e => { const el = e.currentTarget as HTMLDivElement; el.style.borderColor='rgba(124,58,237,0.12)'; el.style.transform='none'; el.style.boxShadow='none' }}
                 >
@@ -109,7 +105,6 @@ export default function DevBoard({ brandId }: { brandId: string }) {
                   </div>
                 </div>
               ))}
-
               {cards.length === 0 && <div style={{ border:'0.5px dashed var(--border-subtle)', borderRadius:'var(--radius-md)', padding:'20px 14px', textAlign:'center', fontSize:11, color:'var(--text-disabled)' }}>Empty</div>}
             </div>
           )
