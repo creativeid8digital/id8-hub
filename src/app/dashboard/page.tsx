@@ -12,7 +12,7 @@ import ApprovalsView from '@/components/views/ApprovalsView'
 import DevBoard from '@/components/views/DevBoard'
 
 export type ViewName = 'campaigns' | 'calendar' | 'briefs' | 'performance' | 'approvals' | 'dev'
-export type Brand = { id: string; name: string; color: string; drive_folder_url?: string | null; created_at?: string }
+export type Brand = { id: string; name: string; color: string; drive_folder_url: string | null; created_at: string }
 
 const VIEWS: Record<ViewName, { title: string; accentWord: string; sub: string }> = {
   campaigns:   { title: 'Campaign',      accentWord: 'Board',    sub: 'All active campaigns across brands' },
