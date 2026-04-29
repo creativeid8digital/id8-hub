@@ -17,7 +17,7 @@ export default function Topbar({ title, accentWord, sub, activeBrand, activeView
   const btnLabel: Record<ViewName, string> = {
     tasks: 'New Task', calendar: 'Add Post', briefs: 'New Brief',
     performance: 'Log Campaign', approvals: 'New Approval',
-    dev: 'New Task', time: 'Start Timer', admin: '',
+    dev: 'New Task', time: 'Start Timer', admin: '', brands: 'Add Brand',
   }
 
   return (
