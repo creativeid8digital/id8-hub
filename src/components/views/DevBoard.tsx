@@ -37,7 +37,7 @@ export default function DevBoard({ brandId }: { brandId: string }) {
     await supabase.from('dev_tasks').update({ status }).eq('id', id)
   }
 
-  const sprints = [...new Set(tasks.map(t => t.sprint_name).filter(Boolean))]
+  const sprints = Array.from(new Set(tasks.map(t => t.sprint_name).filter(Boolean)))
   const activeSprint = sprints[0] || null
   const sprintTasks = activeSprint ? tasks.filter(t => t.sprint_name === activeSprint) : []
   const doneInSprint = sprintTasks.filter(t => t.status === 'deployed').length
