@@ -27,7 +27,7 @@ export default function DashboardPage() {
   const { data: session, status } = useSession()
   const router = useRouter()
   const [activeView, setActiveView] = useState<ViewName>('campaigns')
-  const [activeBrand, setActiveBrand] = useState<Brand>({ id: '', name: 'All Brands', color: '#7c3aed' })
+  const [activeBrand, setActiveBrand] = useState<Brand>({ id: '', name: 'All Brands', color: '#7c3aed', drive_folder_url: null, created_at: '' })
   const [checking, setChecking] = useState(true)
 
   useEffect(() => {
