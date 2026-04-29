@@ -3,23 +3,26 @@ import { useState, useEffect } from 'react'
 import { signOut } from 'next-auth/react'
 import { supabase, type Brand } from '@/lib/supabase'
 import type { ViewName } from '@/app/dashboard/page'
-import { ListTodo, Calendar, FileText, TrendingUp, CheckCircle, Code2, ChevronDown, ChevronUp, LogOut } from 'lucide-react'
+import { ListTodo, Calendar, FileText, TrendingUp, CheckCircle, Code2, ChevronDown, ChevronUp, LogOut, Clock, Shield } from 'lucide-react'
 
 const NAV = [
-  { id: 'tasks'       as ViewName, label: 'Task Pipeline',    icon: ListTodo,    badge: null,  danger: false },
-  { id: 'briefs'      as ViewName, label: 'Brief Hub',        icon: FileText,    badge: null,  danger: false },
-  { id: 'calendar'    as ViewName, label: 'Social Calendar',  icon: Calendar,    badge: 'May', danger: false },
-  { id: 'approvals'   as ViewName, label: 'Approvals',        icon: CheckCircle, badge: '3',   danger: true  },
-  { id: 'performance' as ViewName, label: 'Performance',      icon: TrendingUp,  badge: null,  danger: false },
-  { id: 'dev'         as ViewName, label: 'Dev Projects',     icon: Code2,       badge: null,  danger: false },
+  { id: 'tasks'       as ViewName, label: 'Task Pipeline',   icon: ListTodo,    badge: null,  danger: false, adminOnly: false },
+  { id: 'briefs'      as ViewName, label: 'Brief Hub',       icon: FileText,    badge: null,  danger: false, adminOnly: false },
+  { id: 'calendar'    as ViewName, label: 'Social Calendar', icon: Calendar,    badge: 'May', danger: false, adminOnly: false },
+  { id: 'approvals'   as ViewName, label: 'Approvals',       icon: CheckCircle, badge: '3',   danger: true,  adminOnly: false },
+  { id: 'performance' as ViewName, label: 'Performance',     icon: TrendingUp,  badge: null,  danger: false, adminOnly: false },
+  { id: 'time'        as ViewName, label: 'Time Tracker',    icon: Clock,       badge: null,  danger: false, adminOnly: false },
+  { id: 'dev'         as ViewName, label: 'Dev Projects',    icon: Code2,       badge: null,  danger: false, adminOnly: false },
+  { id: 'admin'       as ViewName, label: 'Admin Panel',     icon: Shield,      badge: null,  danger: false, adminOnly: true  },
 ]
 
 type Props = {
   activeView: ViewName; onViewChange: (v: ViewName) => void
-  activeBrand: Brand; onBrandChange: (b: Brand) => void; user: any
+  activeBrand: Brand; onBrandChange: (b: Brand) => void
+  user: any; isAdmin: boolean
 }
 
-export default function Sidebar({ activeView, onViewChange, activeBrand, onBrandChange, user }: Props) {
+export default function Sidebar({ activeView, onViewChange, activeBrand, onBrandChange, user, isAdmin }: Props) {
   const [brands, setBrands] = useState<Brand[]>([])
   const [ddOpen, setDdOpen] = useState(false)
 
@@ -27,10 +30,11 @@ export default function Sidebar({ activeView, onViewChange, activeBrand, onBrand
     supabase.from('brands').select('*').then(({ data }) => { if (data) setBrands(data) })
   }, [])
 
+  const visibleNav = NAV.filter(item => !item.adminOnly || isAdmin)
+
   return (
     <nav style={{ width: 240, minWidth: 240, background: '#fff', borderRight: '1px solid var(--border-subtle)', display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden' }}>
 
-      {/* Logo */}
       <div style={{ padding: '22px 20px 16px', borderBottom: '1px solid var(--border-subtle)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <div style={{ width: 34, height: 34, borderRadius: 10, background: 'linear-gradient(135deg, #7C3AED, #9F67F7)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 12px rgba(124,58,237,0.25)', flexShrink: 0 }}>
@@ -43,7 +47,6 @@ export default function Sidebar({ activeView, onViewChange, activeBrand, onBrand
         </div>
       </div>
 
-      {/* Brand switcher */}
       <div style={{ padding: '12px 12px 0' }}>
         <button onClick={() => setDdOpen(v => !v)} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 8, padding: '9px 12px', borderRadius: 12, background: '#F5F5F7', border: '1px solid var(--border-subtle)', cursor: 'pointer', transition: 'all 0.15s' }}>
           <div style={{ width: 8, height: 8, borderRadius: '50%', background: activeBrand.color, flexShrink: 0 }} />
@@ -65,14 +68,14 @@ export default function Sidebar({ activeView, onViewChange, activeBrand, onBrand
         )}
       </div>
 
-      {/* Nav */}
       <div style={{ padding: '16px 12px 0', flex: 1, overflowY: 'auto' }}>
         <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-muted)', letterSpacing: '0.08em', textTransform: 'uppercase', padding: '0 8px', marginBottom: 6 }}>Workspace</div>
-        {NAV.map(item => {
+        {visibleNav.map(item => {
           const Icon = item.icon
           const isActive = activeView === item.id
+          const isAdminItem = item.id === 'admin'
           return (
-            <div key={item.id} onClick={() => onViewChange(item.id)} style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '9px 12px', borderRadius: 12, marginBottom: 2, cursor: 'pointer', background: isActive ? 'var(--accent-subtle)' : 'transparent', color: isActive ? 'var(--accent)' : 'var(--text-muted)', fontWeight: isActive ? 600 : 400, fontSize: 13, transition: 'all 0.15s' }}
+            <div key={item.id} onClick={() => onViewChange(item.id)} style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '9px 12px', borderRadius: 12, marginBottom: 2, cursor: 'pointer', background: isActive ? (isAdminItem ? '#FFFBEB' : 'var(--accent-subtle)') : 'transparent', color: isActive ? (isAdminItem ? '#D97706' : 'var(--accent)') : 'var(--text-muted)', fontWeight: isActive ? 600 : 400, fontSize: 13, transition: 'all 0.15s' }}
               onMouseEnter={e => { if (!isActive) (e.currentTarget as HTMLDivElement).style.background = '#F5F5F7' }}
               onMouseLeave={e => { if (!isActive) (e.currentTarget as HTMLDivElement).style.background = 'transparent' }}
             >
@@ -86,7 +89,6 @@ export default function Sidebar({ activeView, onViewChange, activeBrand, onBrand
         })}
       </div>
 
-      {/* Footer */}
       <div style={{ padding: 12, borderTop: '1px solid var(--border-subtle)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '8px 12px', background: '#ECFDF5', borderRadius: 10, marginBottom: 8, border: '1px solid #A7F3D0' }}>
           <div style={{ width: 7, height: 7, borderRadius: '50%', background: '#10B981', flexShrink: 0, animation: 'pulse 2s infinite' }} />
