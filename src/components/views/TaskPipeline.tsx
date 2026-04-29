@@ -64,7 +64,7 @@ export default function TaskPipeline({ brandId, userEmail }: { brandId: string; 
     supabase.from('brands').select('*').then(({ data }) => { if (data) setBrands(data) })
     let bq = supabase.from('briefs').select('id, title, brand_id, brands(name,color)').order('created_at', { ascending: false })
     if (brandId) bq = bq.eq('brand_id', brandId)
-    bq.then(({ data }) => { if (data) setBriefs(data as Brief[]) })
+    bq.then(({ data }) => { if (data) setBriefs(data as unknown as Brief[]) })
     const sub = supabase.channel('tasks').on('postgres_changes', { event: '*', schema: 'public', table: 'tasks' }, loadTasks).subscribe()
     return () => { supabase.removeChannel(sub) }
   }, [loadTasks, brandId])
