@@ -41,7 +41,7 @@ export default function NewCampaignModal({ open, onClose, view }: Props) {
   const labels: Record<ViewName, string> = {
     tasks: 'New Task', calendar: 'New Social Post', briefs: 'New Brief',
     performance: 'Log Campaign', approvals: 'New Approval', dev: 'New Dev Task',
-    time: 'Log Time', admin: '',
+    time: 'Log Time', admin: '', brands: 'Add Brand',
   }
 
   const i: React.CSSProperties = {
