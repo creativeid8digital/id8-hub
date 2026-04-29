@@ -109,13 +109,28 @@ create table if not exists time_logs (
   stopped_at       timestamptz,
   duration_seconds integer,
   note             text,
-  log_date         date generated always as (started_at::date) stored,
-  log_month        text generated always as (to_char(started_at, 'YYYY-MM')) stored,
+  log_date         date,
+  log_month        text,
   created_at       timestamptz default now()
 );
 
 create unique index if not exists one_active_timer_per_user
   on time_logs (user_id) where stopped_at is null;
+-- Auto-fill log_date and log_month on insert
+create or replace function fill_time_log_dates()
+returns trigger as $$
+begin
+  new.log_date  := new.started_at::date;
+  new.log_month := to_char(new.started_at, 'YYYY-MM');
+  return new;
+end;
+$$ language plpgsql;
+
+drop trigger if exists fill_time_log_dates_trigger on time_logs;
+create trigger fill_time_log_dates_trigger
+  before insert on time_logs
+  for each row execute function fill_time_log_dates();
+
 
 -- ── 8. NOTIFICATIONS ────────────────────────────────────────────────
 create table if not exists notifications (
