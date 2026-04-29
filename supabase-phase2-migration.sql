@@ -180,49 +180,61 @@ alter table brief_sections  enable row level security;
 alter table admin_config    enable row level security;
 
 -- Tasks
-create policy if not exists "Auth read tasks"   on tasks for select using (auth.role() = 'authenticated');
-create policy if not exists "Auth insert tasks" on tasks for insert with check (auth.role() = 'authenticated');
-create policy if not exists "Auth update tasks" on tasks for update using (auth.role() = 'authenticated');
+create policy "Auth read tasks"   on tasks for select using (auth.role() = 'authenticated');
+drop policy if exists "Auth insert tasks" on tasks;
+create policy "Auth insert tasks" on tasks for insert with check (auth.role() = 'authenticated');
+drop policy if exists "Auth update tasks" on tasks;
+create policy "Auth update tasks" on tasks for update using (auth.role() = 'authenticated');
 
 -- Task status log
-create policy if not exists "Auth read task_status_log" on task_status_log for select using (auth.role() = 'authenticated');
+drop policy if exists "Auth read task_status_log" on task_status_log;
+create policy "Auth read task_status_log" on task_status_log for select using (auth.role() = 'authenticated');
 
 -- Task comments
-create policy if not exists "Auth read task_comments"   on task_comments for select using (auth.role() = 'authenticated');
-create policy if not exists "Auth insert task_comments" on task_comments for insert with check (auth.role() = 'authenticated');
+create policy "Auth read task_comments"   on task_comments for select using (auth.role() = 'authenticated');
+drop policy if exists "Auth insert task_comments" on task_comments;
+create policy "Auth insert task_comments" on task_comments for insert with check (auth.role() = 'authenticated');
 
 -- Time logs
-create policy if not exists "Users see own time logs" on time_logs for select using (
+drop policy if exists "Users see own time logs" on time_logs;
+create policy "Users see own time logs" on time_logs for select using (
   auth.role() = 'authenticated' and (
     user_id = (select id from users where email = auth.jwt()->>'email')
     or (select is_admin from users where email = auth.jwt()->>'email') = true
   )
 );
-create policy if not exists "Users insert time logs" on time_logs for insert with check (
+drop policy if exists "Users insert time logs" on time_logs;
+create policy "Users insert time logs" on time_logs for insert with check (
   auth.role() = 'authenticated' and user_id = (select id from users where email = auth.jwt()->>'email')
 );
-create policy if not exists "Users update time logs" on time_logs for update using (
+drop policy if exists "Users update time logs" on time_logs;
+create policy "Users update time logs" on time_logs for update using (
   auth.role() = 'authenticated' and user_id = (select id from users where email = auth.jwt()->>'email')
 );
 
 -- Notifications
-create policy if not exists "Users see own notifications"   on notifications for select using (auth.role() = 'authenticated' and user_id = (select id from users where email = auth.jwt()->>'email'));
-create policy if not exists "Auth insert notifications"     on notifications for insert with check (auth.role() = 'authenticated');
-create policy if not exists "Users update notifications"    on notifications for update using (auth.role() = 'authenticated' and user_id = (select id from users where email = auth.jwt()->>'email'));
+create policy "Users see own notifications"   on notifications for select using (auth.role() = 'authenticated' and user_id = (select id from users where email = auth.jwt()->>'email'));
+create policy "Auth insert notifications"     on notifications for insert with check (auth.role() = 'authenticated');
+create policy "Users update notifications"    on notifications for update using (auth.role() = 'authenticated' and user_id = (select id from users where email = auth.jwt()->>'email'));
 
 -- Approval steps
-create policy if not exists "Auth read approval_steps"   on approval_steps for select using (auth.role() = 'authenticated');
-create policy if not exists "Auth insert approval_steps" on approval_steps for insert with check (auth.role() = 'authenticated');
-create policy if not exists "Auth update approval_steps" on approval_steps for update using (auth.role() = 'authenticated');
+create policy "Auth read approval_steps"   on approval_steps for select using (auth.role() = 'authenticated');
+drop policy if exists "Auth insert approval_steps" on approval_steps;
+create policy "Auth insert approval_steps" on approval_steps for insert with check (auth.role() = 'authenticated');
+drop policy if exists "Auth update approval_steps" on approval_steps;
+create policy "Auth update approval_steps" on approval_steps for update using (auth.role() = 'authenticated');
 
 -- Brief sections
-create policy if not exists "Auth read brief_sections"   on brief_sections for select using (auth.role() = 'authenticated');
-create policy if not exists "Auth insert brief_sections" on brief_sections for insert with check (auth.role() = 'authenticated');
-create policy if not exists "Auth update brief_sections" on brief_sections for update using (auth.role() = 'authenticated');
+create policy "Auth read brief_sections"   on brief_sections for select using (auth.role() = 'authenticated');
+drop policy if exists "Auth insert brief_sections" on brief_sections;
+create policy "Auth insert brief_sections" on brief_sections for insert with check (auth.role() = 'authenticated');
+drop policy if exists "Auth update brief_sections" on brief_sections;
+create policy "Auth update brief_sections" on brief_sections for update using (auth.role() = 'authenticated');
 
 -- Admin config
-create policy if not exists "Auth read admin_config"   on admin_config for select using (auth.role() = 'authenticated');
-create policy if not exists "Admins update admin_config" on admin_config for update using ((select is_admin from users where email = auth.jwt()->>'email') = true);
+create policy "Auth read admin_config"   on admin_config for select using (auth.role() = 'authenticated');
+drop policy if exists "Admins update admin_config" on admin_config;
+create policy "Admins update admin_config" on admin_config for update using ((select is_admin from users where email = auth.jwt()->>'email') = true);
 
 -- ── 12. TRIGGERS ────────────────────────────────────────────────────
 create or replace function update_updated_at()
