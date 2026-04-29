@@ -36,7 +36,7 @@ export default function TimeTracker({ brandId, userEmail }: { brandId: string; u
   useEffect(() => {
     let q = supabase.from('tasks').select('id, title, brands(name,color)').neq('status', 'live').order('created_at', { ascending: false })
     if (brandId) q = q.eq('brand_id', brandId)
-    q.then(({ data }) => { if (data) setTasks(data as Task[]) })
+    q.then(({ data }) => { if (data) setTasks(data as unknown as Task[]) })
   }, [brandId])
 
   // Load today's logs
