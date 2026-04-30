@@ -34,7 +34,7 @@ export default function DevBoard({ brandId }: { brandId: string }) {
   }, [loadTasks])
 
   const move = async (id: string, status: string) => {
-    await supabase.from('dev_tasks').update({ status }).eq('id', id)
+    await fetch('/api/devtasks', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, status }) })
   }
 
   const sprints = Array.from(new Set(tasks.map(t => t.sprint_name).filter(Boolean)))

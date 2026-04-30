@@ -10,7 +10,7 @@ const ALL_NAV: { id: ViewName; label: string; icon: any; badge?: string; danger?
   { id: 'myjobs',      label: 'My Tasks',       icon: User,         roles: ['creative_team','content_writer','publishing_team','performance','tech','creative_head'] },
   { id: 'tasks',       label: 'Task Pipeline',  icon: ListTodo,     roles: 'all' },
   { id: 'calendar',    label: 'Social Calendar',icon: Calendar,     badge: 'May', roles: ['am','publishing_team','content_writer','creative_head'] },
-  { id: 'approvals',   label: 'Approvals',      icon: CheckCircle,  badge: '3', danger: true, roles: ['am','creative_head'] },
+  { id: 'approvals',   label: 'Approvals',      icon: CheckCircle,  badge: undefined, danger: true, roles: ['am','creative_head'] },
   { id: 'performance', label: 'Performance',    icon: TrendingUp,   roles: ['am','performance','creative_head'] },
   { id: 'dev',         label: 'Dev Board',      icon: Code2,        roles: ['tech','am','creative_head'] },
   { id: 'brands',      label: 'Brand Manager',  icon: Briefcase,    roles: ['am','creative_head'] },

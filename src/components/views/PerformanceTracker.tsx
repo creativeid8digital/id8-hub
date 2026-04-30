@@ -1,6 +1,5 @@
 'use client'
 import { useEffect, useState, useCallback } from 'react'
-import { supabase } from '@/lib/supabase'
 import { Plus, X } from 'lucide-react'
 
 type PerfCampaign = {
@@ -40,28 +39,31 @@ export default function PerformanceTracker({ brandId }: { brandId: string }) {
 
   const load = useCallback(async () => {
     setLoading(true)
-    let q = supabase.from('performance_campaigns').select('*, brands(name,color)')
-      .eq('month_year', selectedMonth).order('spend', { ascending: false })
-    if (brandId) q = q.eq('brand_id', brandId)
-    const { data } = await q
-    setCampaigns((data as PerfCampaign[]) || [])
+    const params = new URLSearchParams({ month: selectedMonth })
+    if (brandId) params.set('brand_id', brandId)
+    const res = await fetch(`/api/performance?${params}`)
+    const data = await res.json()
+    setCampaigns(Array.isArray(data) ? data as PerfCampaign[] : [])
     setLoading(false)
   }, [brandId, selectedMonth])
 
   useEffect(() => {
     load()
-    supabase.from('brands').select('*').then(({ data }) => { if (data) setBrands(data) })
+    fetch('/api/brands').then(r => r.json()).then(d => { if (Array.isArray(d)) setBrands(d) })
   }, [load])
 
   const createCampaign = async () => {
     if (!form.name.trim()) return
     setSaving(true)
-    await supabase.from('performance_campaigns').insert({
-      name: form.name, brand_id: form.brand_id || null, platform: form.platform,
-      spend: parseFloat(form.spend) || 0, impressions: parseInt(form.impressions) || 0,
-      clicks: parseInt(form.clicks) || 0, ctr: parseFloat(form.ctr) || 0,
-      cpc: parseFloat(form.cpc) || 0, roas: parseFloat(form.roas) || 0,
-      status: form.status, month_year: form.month_year,
+    await fetch('/api/performance', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: form.name, brand_id: form.brand_id || null, platform: form.platform,
+        spend: parseFloat(form.spend) || 0, impressions: parseInt(form.impressions) || 0,
+        clicks: parseInt(form.clicks) || 0, ctr: parseFloat(form.ctr) || 0,
+        cpc: parseFloat(form.cpc) || 0, roas: parseFloat(form.roas) || 0,
+        status: form.status, month_year: form.month_year,
+      })
     })
     setSaving(false); setShowCreate(false)
     setForm({ name: '', brand_id: brandId || '', platform: 'meta', spend: '', impressions: '', clicks: '', ctr: '', cpc: '', roas: '', status: 'live', month_year: selectedMonth })

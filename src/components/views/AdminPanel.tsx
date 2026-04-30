@@ -1,16 +1,10 @@
 'use client'
-import { useEffect, useState, useCallback } from 'react'
-import { supabase } from '@/lib/supabase'
-import { Users, Clock, Shield, TrendingUp, RefreshCw } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { Copy, Check } from 'lucide-react'
 
 type User = {
-  id: string; email: string; name: string | null
-  agency_role: string | null; is_admin: boolean
-  onboarding_complete: boolean; created_at: string
-}
-type MonthlyHours = {
-  user_id: string; user_name: string; agency_role: string
-  log_month: string; sessions: number; total_seconds: number; total_hours: number
+  id: string; name: string; email: string; agency_role: string | null
+  is_admin: boolean; onboarding_complete: boolean; avatar_url: string | null; created_at: string
 }
 
 const ROLES = [
@@ -33,201 +27,145 @@ const ROLE_COLORS: Record<string, { color: string; bg: string }> = {
   tech:            { color: '#06B6D4', bg: '#ECFEFF' },
 }
 
+const inp: React.CSSProperties = {
+  background: '#F5F5F7', border: '1.5px solid #E5E5EA', borderRadius: 8,
+  padding: '7px 10px', fontSize: 12, color: '#1D1D1F',
+  fontFamily: 'var(--font-body)', outline: 'none',
+}
+
 export default function AdminPanel() {
   const [users, setUsers] = useState<User[]>([])
-  const [hours, setHours] = useState<MonthlyHours[]>([])
   const [loading, setLoading] = useState(true)
-  const [tab, setTab] = useState<'users' | 'hours'>('users')
-  const [updatingRole, setUpdatingRole] = useState<string | null>(null)
-  const [saved, setSaved] = useState<string | null>(null)
+  const [saving, setSaving] = useState<string | null>(null)
+  const [copied, setCopied] = useState(false)
+  const inviteLink = typeof window !== 'undefined' ? window.location.origin : 'https://hub.id8.digital'
 
-  const currentMonth = new Date().toISOString().slice(0, 7)
-
-  const load = useCallback(async () => {
+  const load = async () => {
     setLoading(true)
-    const [{ data: usersData }, { data: hoursData }] = await Promise.all([
-      supabase.from('users').select('*').order('created_at', { ascending: false }),
-      supabase.from('monthly_hours_summary').select('*').eq('log_month', currentMonth).order('total_hours', { ascending: false }),
-    ])
-    setUsers((usersData as User[]) || [])
-    setHours((hoursData as MonthlyHours[]) || [])
+    const res = await fetch('/api/admin')
+    const data = await res.json()
+    setUsers(Array.isArray(data) ? data : [])
     setLoading(false)
-  }, [currentMonth])
-
-  useEffect(() => { load() }, [load])
-
-  const updateRole = async (userId: string, role: string) => {
-    setUpdatingRole(userId)
-    await supabase.from('users').update({ agency_role: role }).eq('id', userId)
-    setUsers(users.map(u => u.id === userId ? { ...u, agency_role: role } : u))
-    setUpdatingRole(null)
-    setSaved(userId)
-    setTimeout(() => setSaved(null), 2000)
   }
 
-  const toggleAdmin = async (userId: string, current: boolean) => {
-    await supabase.from('users').update({ is_admin: !current }).eq('id', userId)
-    setUsers(users.map(u => u.id === userId ? { ...u, is_admin: !current } : u))
+  useEffect(() => { load() }, [])
+
+  const updateUser = async (id: string, agency_role: string, is_admin: boolean) => {
+    setSaving(id)
+    await fetch('/api/admin', {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, agency_role, is_admin })
+    })
+    setSaving(null)
+    load()
   }
 
-  const fmtHours = (secs: number) => (secs / 3600).toFixed(1) + 'h'
-  const totalHours = hours.reduce((a, h) => a + (h.total_seconds || 0) / 3600, 0)
-
-  const inputStyle: React.CSSProperties = {
-    background: '#F5F5F7', border: '1px solid #E5E5EA', borderRadius: 8,
-    padding: '5px 8px', fontSize: 12, color: '#1D1D1F',
-    fontFamily: 'var(--font-body)', outline: 'none', cursor: 'pointer',
+  const copyInvite = () => {
+    navigator.clipboard.writeText(inviteLink)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
   }
+
+  const active   = users.filter(u => u.onboarding_complete)
+  const pending  = users.filter(u => !u.onboarding_complete)
 
   return (
     <div>
-      {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
         <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 12px', background: '#FFFBEB', border: '1px solid #FDE68A', borderRadius: 100 }}>
-              <Shield size={12} color="#D97706" />
-              <span style={{ fontSize: 11, fontWeight: 700, color: '#D97706' }}>Admin Only</span>
-            </div>
-          </div>
-          <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--text-primary)', marginTop: 6 }}>Admin Panel</div>
-          <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 3 }}>Manage team, roles and time reports</div>
+          <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--text-primary)' }}>Admin Panel</div>
+          <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 3 }}>Manage team members, roles and access</div>
         </div>
-        <button onClick={load} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 16px', borderRadius: 100, background: '#F5F5F7', color: 'var(--text-secondary)', border: '1px solid var(--border-default)', fontSize: 13, fontWeight: 500, cursor: 'pointer', fontFamily: 'var(--font-body)' }}>
-          <RefreshCw size={13} /> Refresh
-        </button>
+      </div>
+
+      {/* Invite section */}
+      <div style={{ background: 'linear-gradient(135deg, #7C3AED, #9F67F7)', borderRadius: 20, padding: 24, marginBottom: 24, color: '#fff' }}>
+        <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 6 }}>📨 Invite Team Members</div>
+        <div style={{ fontSize: 13, opacity: 0.85, marginBottom: 16 }}>
+          Share this link with your team. They sign in with Google and pick their role.
+        </div>
+        <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+          <div style={{ flex: 1, background: 'rgba(255,255,255,0.15)', borderRadius: 10, padding: '10px 14px', fontSize: 13, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {inviteLink}
+          </div>
+          <button onClick={copyInvite}
+            style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '10px 18px', borderRadius: 100, background: '#fff', color: '#7C3AED', border: 'none', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--font-body)', flexShrink: 0, transition: 'all 0.2s' }}>
+            {copied ? <><Check size={14} /> Copied!</> : <><Copy size={14} /> Copy Link</>}
+          </button>
+        </div>
       </div>
 
       {/* Stats */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12, marginBottom: 20 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 12, marginBottom: 24 }}>
         {[
-          { label: 'Team Members', value: users.length,                                         icon: <Users size={16} color="#7C3AED" />,     bg: '#EDE9FE' },
-          { label: 'Onboarded',    value: users.filter(u => u.onboarding_complete).length,      icon: <Shield size={16} color="#10B981" />,    bg: '#ECFDF5' },
-          { label: 'Hours This Month', value: `${totalHours.toFixed(1)}h`,                      icon: <Clock size={16} color="#F59E0B" />,     bg: '#FFFBEB' },
-          { label: 'Admins',       value: users.filter(u => u.is_admin).length,                 icon: <TrendingUp size={16} color="#3B82F6" />, bg: '#EFF6FF' },
+          { label: 'Total Members', value: users.length, color: 'var(--accent)', icon: '👥' },
+          { label: 'Active',        value: active.length, color: '#10B981', icon: '✅' },
+          { label: 'Pending Setup', value: pending.length, color: '#F59E0B', icon: '⏳' },
         ].map(s => (
-          <div key={s.label} style={{ background: '#fff', border: '1px solid var(--border-subtle)', borderRadius: 16, padding: '16px 18px', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-              <div style={{ width: 32, height: 32, borderRadius: 8, background: s.bg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{s.icon}</div>
-              <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{s.label}</div>
-            </div>
-            <div style={{ fontSize: 28, fontWeight: 700, color: 'var(--text-primary)' }}>{s.value}</div>
+          <div key={s.label} style={{ background: '#fff', border: '1px solid var(--border-subtle)', borderRadius: 16, padding: '16px 20px', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+            <div style={{ fontSize: 20, marginBottom: 6 }}>{s.icon}</div>
+            <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>{s.label}</div>
+            <div style={{ fontSize: 26, fontWeight: 700, color: s.color }}>{s.value}</div>
           </div>
         ))}
       </div>
 
-      {/* Tabs */}
-      <div style={{ display: 'flex', gap: 4, marginBottom: 20, background: '#F5F5F7', padding: 4, borderRadius: 12, width: 'fit-content' }}>
-        {(['users', 'hours'] as const).map(t => (
-          <button key={t} onClick={() => setTab(t)} style={{ padding: '7px 18px', borderRadius: 9, border: 'none', background: tab === t ? '#fff' : 'transparent', color: tab === t ? 'var(--text-primary)' : 'var(--text-muted)', fontWeight: tab === t ? 600 : 400, fontSize: 13, cursor: 'pointer', fontFamily: 'var(--font-body)', boxShadow: tab === t ? '0 1px 4px rgba(0,0,0,0.08)' : 'none', transition: 'all 0.15s' }}>
-            {t === 'users' ? '👥 Team Members' : '⏱ Time Reports'}
-          </button>
-        ))}
-      </div>
-
-      {/* ── USERS TAB ── */}
-      {tab === 'users' && (
-        <div style={{ background: '#fff', border: '1px solid var(--border-subtle)', borderRadius: 20, overflow: 'hidden', boxShadow: '0 2px 12px rgba(0,0,0,0.06)' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-            <thead>
-              <tr style={{ background: '#F5F5F7' }}>
-                {['Member', 'Role', 'Status', 'Admin', 'Joined'].map(h => (
-                  <th key={h} style={{ padding: '12px 16px', textAlign: 'left', fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.07em', borderBottom: '1px solid var(--border-subtle)' }}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {loading ? (
-                <tr><td colSpan={5} style={{ padding: 24, textAlign: 'center', color: 'var(--text-muted)', fontSize: 13 }}>Loading…</td></tr>
-              ) : users.map(u => {
-                const roleStyle = ROLE_COLORS[u.agency_role || ''] || { color: '#86868B', bg: '#F5F5F7' }
-                return (
-                  <tr key={u.id} style={{ borderBottom: '1px solid var(--border-subtle)', transition: 'background 0.1s' }}
-                    onMouseEnter={e => (e.currentTarget as HTMLTableRowElement).style.background = '#FAFAFA'}
-                    onMouseLeave={e => (e.currentTarget as HTMLTableRowElement).style.background = 'transparent'}
-                  >
-                    <td style={{ padding: '14px 16px' }}>
-                      <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>{u.name || '—'}</div>
-                      <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{u.email}</div>
-                    </td>
-                    <td style={{ padding: '14px 16px' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <select value={u.agency_role || ''} onChange={e => updateRole(u.id, e.target.value)} style={{ ...inputStyle, color: roleStyle.color, background: roleStyle.bg, border: 'none', fontWeight: 600 }}>
-                          <option value="">No Role</option>
-                          {ROLES.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
-                        </select>
-                        {saved === u.id && <span style={{ fontSize: 11, color: '#10B981', fontWeight: 600 }}>Saved ✓</span>}
-                        {updatingRole === u.id && <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>Saving…</span>}
-                      </div>
-                    </td>
-                    <td style={{ padding: '14px 16px' }}>
-                      <span style={{ fontSize: 11, fontWeight: 600, padding: '3px 10px', borderRadius: 100, background: u.onboarding_complete ? '#ECFDF5' : '#FEE2E2', color: u.onboarding_complete ? '#10B981' : '#EF4444' }}>
-                        {u.onboarding_complete ? 'Active' : 'Pending'}
-                      </span>
-                    </td>
-                    <td style={{ padding: '14px 16px' }}>
-                      <button onClick={() => toggleAdmin(u.id, u.is_admin)} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '4px 12px', borderRadius: 100, border: 'none', background: u.is_admin ? '#FFFBEB' : '#F5F5F7', color: u.is_admin ? '#D97706' : 'var(--text-muted)', fontSize: 11, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font-body)', transition: 'all 0.15s' }}>
-                        {u.is_admin ? '★ Admin' : '☆ Member'}
-                      </button>
-                    </td>
-                    <td style={{ padding: '14px 16px', fontSize: 12, color: 'var(--text-muted)' }}>
-                      {new Date(u.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        </div>
-      )}
-
-      {/* ── HOURS TAB ── */}
-      {tab === 'hours' && (
-        <div>
-          <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 14 }}>
-            {new Date().toLocaleDateString('en-IN', { month: 'long', year: 'numeric' })} — Team Hours
+      {/* Team table */}
+      {loading ? (
+        <div style={{ color: 'var(--text-muted)', fontSize: 13, padding: 20 }}>Loading team…</div>
+      ) : (
+        <div style={{ background: '#fff', border: '1px solid var(--border-subtle)', borderRadius: 20, overflow: 'hidden', boxShadow: '0 2px 12px rgba(0,0,0,0.05)' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 180px 100px 80px', background: '#F5F5F7', borderBottom: '1px solid var(--border-subtle)', padding: '12px 20px', gap: 0 }}>
+            {['Member', 'Role', 'Admin', 'Status'].map(h => (
+              <div key={h} style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.07em' }}>{h}</div>
+            ))}
           </div>
-          {hours.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '40px', background: '#fff', borderRadius: 16, border: '1.5px dashed var(--border-default)', color: 'var(--text-muted)', fontSize: 13 }}>
-              No time logged this month yet.
-            </div>
-          ) : (
-            <div style={{ background: '#fff', border: '1px solid var(--border-subtle)', borderRadius: 20, overflow: 'hidden', boxShadow: '0 2px 12px rgba(0,0,0,0.06)' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                <thead>
-                  <tr style={{ background: '#F5F5F7' }}>
-                    {['Team Member', 'Role', 'Sessions', 'Total Hours', 'Progress'].map(h => (
-                      <th key={h} style={{ padding: '12px 16px', textAlign: 'left', fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.07em', borderBottom: '1px solid var(--border-subtle)' }}>{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {hours.map(h => {
-                    const roleStyle = ROLE_COLORS[h.agency_role] || { color: '#86868B', bg: '#F5F5F7' }
-                    const pct = Math.min(100, (h.total_hours / 160) * 100)
-                    return (
-                      <tr key={h.user_id} style={{ borderBottom: '1px solid var(--border-subtle)' }}>
-                        <td style={{ padding: '14px 16px', fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>{h.user_name}</td>
-                        <td style={{ padding: '14px 16px' }}>
-                          <span style={{ fontSize: 11, fontWeight: 600, padding: '3px 10px', borderRadius: 100, background: roleStyle.bg, color: roleStyle.color }}>
-                            {h.agency_role?.replace('_', ' ') || '—'}
-                          </span>
-                        </td>
-                        <td style={{ padding: '14px 16px', fontSize: 13, color: 'var(--text-secondary)', fontWeight: 500 }}>{h.sessions}</td>
-                        <td style={{ padding: '14px 16px', fontSize: 14, fontWeight: 700, color: 'var(--accent)' }}>{h.total_hours.toFixed(1)}h</td>
-                        <td style={{ padding: '14px 16px', minWidth: 140 }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                            <div style={{ flex: 1, height: 6, background: '#F5F5F7', borderRadius: 100, overflow: 'hidden' }}>
-                              <div style={{ height: '100%', width: `${pct}%`, background: 'linear-gradient(90deg, var(--accent), #9F67F7)', borderRadius: 100 }} />
-                            </div>
-                            <span style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 500, flexShrink: 0 }}>{pct.toFixed(0)}%</span>
-                          </div>
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
+
+          {users.map(user => {
+            const rc = ROLE_COLORS[user.agency_role || ''] || { color: '#86868B', bg: '#F5F5F7' }
+            return (
+              <div key={user.id} style={{ display: 'grid', gridTemplateColumns: '1fr 180px 100px 80px', padding: '14px 20px', borderBottom: '1px solid var(--border-subtle)', alignItems: 'center', gap: 0 }}>
+                {/* Member */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <div style={{ width: 36, height: 36, borderRadius: '50%', background: rc.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700, color: rc.color, flexShrink: 0 }}>
+                    {user.name?.[0] || user.email[0].toUpperCase()}
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>{user.name || '—'}</div>
+                    <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{user.email}</div>
+                  </div>
+                </div>
+
+                {/* Role dropdown */}
+                <select style={inp} value={user.agency_role || ''} disabled={saving === user.id}
+                  onChange={e => updateUser(user.id, e.target.value, user.is_admin)}>
+                  <option value="">No role</option>
+                  {ROLES.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
+                </select>
+
+                {/* Admin toggle */}
+                <div style={{ display: 'flex', alignItems: 'center' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
+                    <input type="checkbox" checked={user.is_admin} onChange={e => updateUser(user.id, user.agency_role || '', e.target.checked)} disabled={saving === user.id} />
+                    <span style={{ fontSize: 12, color: user.is_admin ? 'var(--accent)' : 'var(--text-muted)', fontWeight: user.is_admin ? 600 : 400 }}>
+                      {user.is_admin ? 'Yes' : 'No'}
+                    </span>
+                  </label>
+                </div>
+
+                {/* Status */}
+                <div>
+                  <span style={{ fontSize: 11, fontWeight: 600, padding: '3px 10px', borderRadius: 100, background: user.onboarding_complete ? '#ECFDF5' : '#FFFBEB', color: user.onboarding_complete ? '#10B981' : '#D97706' }}>
+                    {user.onboarding_complete ? 'Active' : 'Pending'}
+                  </span>
+                </div>
+              </div>
+            )
+          })}
+
+          {users.length === 0 && (
+            <div style={{ padding: '40px 20px', textAlign: 'center', color: 'var(--text-muted)', fontSize: 13 }}>
+              No team members yet. Share the invite link above.
             </div>
           )}
         </div>

@@ -1,6 +1,5 @@
 'use client'
 import { useEffect, useState, useCallback } from 'react'
-import { supabase } from '@/lib/supabase'
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay, isToday } from 'date-fns'
 import { Plus, X, Save } from 'lucide-react'
 
@@ -56,27 +55,30 @@ export default function SocialCalendar({ brandId }: { brandId: string }) {
   const load = useCallback(async () => {
     const start = format(startOfMonth(month), 'yyyy-MM-dd')
     const end = format(endOfMonth(month), 'yyyy-MM-dd')
-    let q = supabase.from('social_posts').select('*, brands(name,color)')
-      .gte('scheduled_date', start).lte('scheduled_date', end)
-    if (filterBrand) q = q.eq('brand_id', filterBrand)
-    const { data } = await q
-    setPosts((data as Post[]) || [])
+    const params = new URLSearchParams({ start, end })
+    if (filterBrand) params.set('brand_id', filterBrand)
+    const res = await fetch(`/api/social?${params}`)
+    const data = await res.json()
+    setPosts(Array.isArray(data) ? data as Post[] : [])
   }, [month, filterBrand])
 
   useEffect(() => {
     load()
-    supabase.from('brands').select('*').then(({ data }) => { if (data) setBrands(data) })
-    supabase.from('users').select('id, name').then(({ data }) => { if (data) setUsers(data) })
+    fetch('/api/brands').then(r => r.json()).then(d => { if (Array.isArray(d)) setBrands(d) })
+    fetch('/api/team').then(r => r.json()).then(d => { if (Array.isArray(d)) setUsers(d) })
   }, [load])
 
   const createPost = async () => {
     if (!form.title.trim() || !form.scheduled_date) return
     setSaving(true)
-    await supabase.from('social_posts').insert({
-      title: form.title, platform: form.platform, post_type: form.post_type,
-      scheduled_date: form.scheduled_date, status: form.status,
-      brand_id: form.brand_id || null, assigned_to: form.assigned_to || null,
-      drive_file_url: form.drive_file_url || null, notes: form.notes || null,
+    await fetch('/api/social', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        title: form.title, platform: form.platform, post_type: form.post_type,
+        scheduled_date: form.scheduled_date, status: form.status,
+        brand_id: form.brand_id || null, assigned_to: form.assigned_to || null,
+        drive_file_url: form.drive_file_url || null, notes: form.notes || null,
+      })
     })
     setSaving(false); setShowCreate(false)
     setForm({ title: '', platform: 'instagram', post_type: 'reel', scheduled_date: '', status: 'planned', brand_id: brandId || '', assigned_to: '', drive_file_url: '', notes: '' })
@@ -84,7 +86,7 @@ export default function SocialCalendar({ brandId }: { brandId: string }) {
   }
 
   const updatePostStatus = async (id: string, status: string) => {
-    await supabase.from('social_posts').update({ status }).eq('id', id)
+    await fetch('/api/social', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, status }) })
     setPosts(posts.map(p => p.id === id ? { ...p, status } : p))
     if (selectedPost?.id === id) setSelectedPost({ ...selectedPost, status })
   }
