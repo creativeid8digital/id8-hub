@@ -260,3 +260,9 @@ create or replace view monthly_hours_summary as
   order by tl.log_month desc, total_hours desc;
 
 -- ── DONE ────────────────────────────────────────────────────────────
+
+-- ── STORAGE BUCKET FOR CREATIVES ────────────────────────────────────
+-- Run this separately in Supabase Dashboard → Storage → New Bucket
+-- Name: creatives, Public: true
+-- OR uncomment below if using SQL (requires storage extension):
+-- insert into storage.buckets (id, name, public) values ('creatives', 'creatives', true) on conflict do nothing;
