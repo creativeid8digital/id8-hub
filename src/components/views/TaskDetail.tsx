@@ -37,6 +37,8 @@ export default function TaskDetail({ taskId, onBack, userEmail }: Props) {
   const [comments, setComments] = useState<Comment[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [uploading, setUploading] = useState(false)
+  const [uploadedUrl, setUploadedUrl] = useState<string | null>(null)
   const [saved, setSaved] = useState(false)
   const [newComment, setNewComment] = useState('')
   const [postingComment, setPostingComment] = useState(false)
@@ -59,6 +61,30 @@ export default function TaskDetail({ taskId, onBack, userEmail }: Props) {
   }, [taskId])
 
   useEffect(() => { load() }, [load])
+
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    if (file.size > 50 * 1024 * 1024) { alert('File too large. Max 50MB.'); return }
+    setUploading(true)
+    try {
+      const formData = new FormData()
+      formData.append('file', file)
+      formData.append('task_id', taskId)
+      const res = await fetch('/api/upload', { method: 'POST', body: formData })
+      const data = await res.json()
+      if (data.url) {
+        setUploadedUrl(data.url)
+        setEdit(prev => ({ ...prev, drive_file_url: data.url }))
+      } else {
+        alert('Upload failed: ' + (data.error || 'Unknown error'))
+      }
+    } catch (err) {
+      alert('Upload failed. Please try again.')
+    }
+    setUploading(false)
+  }
 
   const saveTask = async () => {
     setSaving(true)
@@ -136,6 +162,33 @@ export default function TaskDetail({ taskId, onBack, userEmail }: Props) {
                 )}
               </div>
             )}
+
+
+            {/* Upload Creative */}
+            <div style={{ marginTop: 16, background: '#fff', border: '1.5px solid var(--border-default)', borderRadius: 14, padding: 18 }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 4 }}>📎 Upload Creative</div>
+              <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 14 }}>Upload your work for review. Images, PDFs and videos accepted.</div>
+              
+              {uploading && <div style={{ fontSize: 12, color: 'var(--accent)', marginBottom: 10, fontWeight: 500 }}>⏳ Uploading…</div>}
+              {uploadedUrl && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14, padding: '8px 12px', background: '#ECFDF5', borderRadius: 10, border: '1px solid #A7F3D0' }}>
+                  <span style={{ fontSize: 11, fontWeight: 600, color: '#10B981' }}>✓ File uploaded</span>
+                  <a href={uploadedUrl} target="_blank" rel="noopener noreferrer" style={{ fontSize: 11, color: '#3B82F6', fontWeight: 500, textDecoration: 'none' }}>View file →</a>
+                </div>
+              )}
+
+              <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '24px', border: '2px dashed var(--border-default)', borderRadius: 12, cursor: 'pointer', background: '#FAFAFA', transition: 'all 0.2s' }}
+                onMouseEnter={e => { const el = e.currentTarget as HTMLLabelElement; el.style.borderColor = 'var(--accent)'; el.style.background = 'var(--accent-subtle)' }}
+                onMouseLeave={e => { const el = e.currentTarget as HTMLLabelElement; el.style.borderColor = 'var(--border-default)'; el.style.background = '#FAFAFA' }}
+              >
+                <input type="file" accept="image/*,video/*,.pdf" style={{ display: 'none' }} onChange={handleFileUpload} />
+                <div style={{ textAlign: 'center' }}>
+                  <div style={{ fontSize: 24, marginBottom: 6 }}>☁️</div>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>Click to upload creative</div>
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 3 }}>JPG, PNG, PDF, MP4 · Max 50MB</div>
+                </div>
+              </label>
+            </div>
 
             {/* Pipeline progress */}
             <div style={{ marginTop:20 }}>
