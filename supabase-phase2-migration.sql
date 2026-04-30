@@ -266,3 +266,18 @@ create or replace view monthly_hours_summary as
 -- Name: creatives, Public: true
 -- OR uncomment below if using SQL (requires storage extension):
 -- insert into storage.buckets (id, name, public) values ('creatives', 'creatives', true) on conflict do nothing;
+
+-- ── BRANDS RLS FIX ──────────────────────────────────────────────────
+-- The original schema may not have had RLS policies for brands inserts
+-- Run this if brand creation is failing silently
+alter table brands enable row level security;
+
+drop policy if exists "Auth read brands"   on brands;
+drop policy if exists "Auth insert brands" on brands;
+drop policy if exists "Auth update brands" on brands;
+drop policy if exists "Auth delete brands" on brands;
+
+create policy "Auth read brands"   on brands for select using (auth.role() = 'authenticated');
+create policy "Auth insert brands" on brands for insert with check (auth.role() = 'authenticated');
+create policy "Auth update brands" on brands for update using (auth.role() = 'authenticated');
+create policy "Auth delete brands" on brands for delete using (auth.role() = 'authenticated');
