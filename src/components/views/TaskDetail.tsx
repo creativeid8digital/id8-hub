@@ -43,6 +43,10 @@ export default function TaskDetail({ taskId, onBack, userEmail }: Props) {
   const [newComment, setNewComment] = useState('')
   const [postingComment, setPostingComment] = useState(false)
   const [edit, setEdit] = useState({ title:'', description:'', priority:'medium', due_date:'', drive_file_url:'', status:'brief' })
+  const [activeTimer, setActiveTimer] = useState<any>(null)
+  const [elapsed, setElapsed] = useState(0)
+  const [todayLogs, setTodayLogs] = useState<any[]>([])
+  const [timerLoading, setTimerLoading] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -58,10 +62,66 @@ export default function TaskDetail({ taskId, onBack, userEmail }: Props) {
     }
     setComments(data.comments || [])
     setLoading(false)
+    // Load timer state
+    const tr = await fetch(`/api/time?task_id=${taskId}`)
+    const td = await tr.json()
+    if (td.active) setActiveTimer(td.active)
+    setTodayLogs(td.todayLogs || [])
   }, [taskId])
 
   useEffect(() => { load() }, [load])
 
+
+  useEffect(() => {
+    if (!activeTimer) { setElapsed(0); return }
+    const tick = setInterval(() => {
+      setElapsed(Math.floor((Date.now() - new Date(activeTimer.started_at).getTime()) / 1000))
+    }, 1000)
+    return () => clearInterval(tick)
+  }, [activeTimer])
+
+  const startTimer = async () => {
+    if (timerLoading) return
+    setTimerLoading(true)
+    const res = await fetch('/api/time', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ task_id: taskId, brand_id: task?.brand_id })
+    })
+    const data = await res.json()
+    if (data.id) setActiveTimer(data)
+    setTimerLoading(false)
+  }
+
+  const stopTimer = async () => {
+    if (!activeTimer || timerLoading) return
+    setTimerLoading(true)
+    await fetch('/api/time', {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ log_id: activeTimer.id })
+    })
+    setActiveTimer(null)
+    setElapsed(0)
+    // Reload today's logs
+    const tr = await fetch(`/api/time?task_id=${taskId}`)
+    const td = await tr.json()
+    setTodayLogs(td.todayLogs || [])
+    setTimerLoading(false)
+  }
+
+  const fmtTime = (secs: number) => {
+    const h = Math.floor(secs / 3600)
+    const m = Math.floor((secs % 3600) / 60)
+    const s = secs % 60
+    return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`
+  }
+
+  const fmtDuration = (secs: number) => {
+    const h = Math.floor(secs / 3600)
+    const m = Math.floor((secs % 3600) / 60)
+    return h > 0 ? `${h}h ${m}m` : `${m}m`
+  }
+
+  const todayTotal = todayLogs.filter(l => l.duration_seconds).reduce((a: number, l: any) => a + l.duration_seconds, 0)
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -289,6 +349,23 @@ export default function TaskDetail({ taskId, onBack, userEmail }: Props) {
               style={{ width:'100%', display:'flex', alignItems:'center', justifyContent:'center', gap:7, padding:'10px', borderRadius:100, background:saved?'#10B981':'var(--accent)', color:'#fff', border:'none', fontSize:13, fontWeight:600, cursor:saving?'not-allowed':'pointer', fontFamily:'var(--font-body)', boxShadow:'0 4px 12px rgba(124,58,237,0.25)', transition:'background 0.3s' }}>
               <Save size={14} />{saved?'Saved ✓':saving?'Saving…':'Save Changes'}
             </button>
+          </div>
+
+          {/* Time Tracker */}
+          <div style={{ background: activeTimer ? '#1D1D1F' : '#fff', border: `1px solid ${activeTimer ? '#1D1D1F' : 'var(--border-subtle)'}`, borderRadius: 14, padding: '16px', marginBottom: 12, boxShadow: '0 2px 8px rgba(0,0,0,0.05)', transition: 'all 0.3s' }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: activeTimer ? 'rgba(255,255,255,0.6)' : 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 10 }}>⏱ Time Tracker</div>
+            <div style={{ fontSize: 28, fontWeight: 800, color: activeTimer ? '#fff' : 'var(--text-primary)', fontVariantNumeric: 'tabular-nums', textAlign: 'center', marginBottom: 12, letterSpacing: '0.04em' }}>
+              {fmtTime(elapsed)}
+            </div>
+            <button onClick={activeTimer ? stopTimer : startTimer} disabled={timerLoading}
+              style={{ width: '100%', padding: '10px', borderRadius: 100, border: 'none', background: activeTimer ? '#EF4444' : 'var(--accent)', color: '#fff', fontSize: 13, fontWeight: 700, cursor: timerLoading ? 'not-allowed' : 'pointer', fontFamily: 'var(--font-body)', transition: 'all 0.2s', boxShadow: activeTimer ? '0 4px 12px rgba(239,68,68,0.4)' : '0 4px 12px rgba(124,58,237,0.3)' }}>
+              {timerLoading ? '…' : activeTimer ? '⏹ Stop Timer' : '▶ Start Timer'}
+            </button>
+            {todayTotal > 0 && (
+              <div style={{ marginTop: 10, fontSize: 11, color: activeTimer ? 'rgba(255,255,255,0.5)' : 'var(--text-muted)', textAlign: 'center' }}>
+                Today: <strong style={{ color: activeTimer ? 'rgba(255,255,255,0.8)' : 'var(--accent)' }}>{fmtDuration(todayTotal)}</strong> logged on this task
+              </div>
+            )}
           </div>
 
           {/* Assignee */}
