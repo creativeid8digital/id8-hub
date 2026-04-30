@@ -15,7 +15,7 @@ import MyTasks from '@/components/views/MyTasks'
 import SearchView from '@/components/views/SearchView'
 import NewJobModal from '@/components/ui/NewJobModal'
 import NotificationBell from '@/components/ui/NotificationBell'
-import { Plus, RefreshCw, Search } from 'lucide-react'
+import { Plus, Search } from 'lucide-react'
 
 export type ViewName = 'tasks' | 'myjobs' | 'calendar' | 'briefs' | 'performance' | 'approvals' | 'dev' | 'admin' | 'brands' | 'search'
 export type Brand = { id: string; name: string; color: string; drive_folder_url: string | null; created_at: string }
