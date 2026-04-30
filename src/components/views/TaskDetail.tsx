@@ -44,7 +44,9 @@ export default function TaskDetail({ taskId, onBack, userEmail }: Props) {
   const [postingComment, setPostingComment] = useState(false)
   const [edit, setEdit] = useState({ title:'', description:'', priority:'medium', due_date:'', drive_file_url:'', status:'brief' })
   const [activeTimer, setActiveTimer] = useState<any>(null)
+  const [paused, setPaused] = useState(false)
   const [elapsed, setElapsed] = useState(0)
+  const [pausedAt, setPausedAt] = useState(0)  // elapsed when paused
   const [todayLogs, setTodayLogs] = useState<any[]>([])
   const [timerLoading, setTimerLoading] = useState(false)
 
@@ -73,12 +75,14 @@ export default function TaskDetail({ taskId, onBack, userEmail }: Props) {
 
 
   useEffect(() => {
-    if (!activeTimer) { setElapsed(0); return }
+    if (!activeTimer || paused) return
+    const base = pausedAt // accumulated before this session started
+    const sessionStart = Date.now()
     const tick = setInterval(() => {
-      setElapsed(Math.floor((Date.now() - new Date(activeTimer.started_at).getTime()) / 1000))
+      setElapsed(base + Math.floor((Date.now() - sessionStart) / 1000))
     }, 1000)
     return () => clearInterval(tick)
-  }, [activeTimer])
+  }, [activeTimer, paused, pausedAt])
 
   const startTimer = async () => {
     if (timerLoading) return
@@ -88,23 +92,26 @@ export default function TaskDetail({ taskId, onBack, userEmail }: Props) {
       body: JSON.stringify({ task_id: taskId, brand_id: task?.brand_id })
     })
     const data = await res.json()
-    if (data.id) setActiveTimer(data)
+    if (data.id) {
+      setActiveTimer(data)
+      setPaused(false)
+      setPausedAt(0)
+      setElapsed(0)
+    }
     setTimerLoading(false)
   }
 
-  const pauseTimer = async () => {
-    if (!activeTimer || timerLoading) return
-    setTimerLoading(true)
-    await fetch('/api/time', {
-      method: 'PUT', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ log_id: activeTimer.id })
-    })
-    setActiveTimer(null)
-    setElapsed(0)
-    const tr = await fetch(`/api/time?task_id=${taskId}`)
-    const td = await tr.json()
-    setTodayLogs(td.todayLogs || [])
-    setTimerLoading(false)
+  const pauseTimer = () => {
+    if (!activeTimer) return
+    // Just pause locally — save elapsed so resume picks up from here
+    setPaused(true)
+    setPausedAt(elapsed)
+  }
+
+  const resumeTimer = () => {
+    if (!activeTimer || !paused) return
+    setPaused(false)
+    // pausedAt is already set, tick effect will add to it
   }
 
   const stopTimer = async () => {
@@ -366,11 +373,15 @@ export default function TaskDetail({ taskId, onBack, userEmail }: Props) {
           </div>
 
           {/* Time Tracker */}
-          <div style={{ background: activeTimer ? '#1D1D1F' : '#fff', border: `1px solid ${activeTimer ? 'transparent' : 'var(--border-subtle)'}`, borderRadius: 16, padding: '18px', marginBottom: 12, boxShadow: activeTimer ? '0 8px 32px rgba(0,0,0,0.3)' : '0 2px 8px rgba(0,0,0,0.05)', transition: 'all 0.4s' }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: activeTimer ? 'rgba(255,255,255,0.5)' : 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 12 }}>⏱ Time Tracker</div>
+          <div style={{ background: activeTimer && !paused ? '#1D1D1F' : activeTimer && paused ? '#2D2D35' : '#fff', border: `1px solid ${activeTimer ? 'transparent' : 'var(--border-subtle)'}`, borderRadius: 16, padding: '18px', marginBottom: 12, boxShadow: activeTimer ? '0 8px 32px rgba(0,0,0,0.3)' : '0 2px 8px rgba(0,0,0,0.05)', transition: 'all 0.4s' }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: activeTimer ? 'rgba(255,255,255,0.5)' : 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
+              ⏱ Time Tracker
+              {activeTimer && paused && <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 100, background: 'rgba(245,158,11,0.2)', color: '#F59E0B', letterSpacing: '0.1em' }}>PAUSED</span>}
+              {activeTimer && !paused && <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 100, background: 'rgba(34,197,94,0.2)', color: '#4ADE80', letterSpacing: '0.1em' }}>RUNNING</span>}
+            </div>
             
             {/* Clock */}
-            <div style={{ fontSize: 32, fontWeight: 800, color: activeTimer ? '#fff' : 'var(--text-primary)', fontVariantNumeric: 'tabular-nums', textAlign: 'center', marginBottom: 14, letterSpacing: '0.06em', fontFamily: 'monospace' }}>
+            <div style={{ fontSize: 32, fontWeight: 800, color: activeTimer ? (paused ? 'rgba(255,255,255,0.4)' : '#fff') : 'var(--text-primary)', fontVariantNumeric: 'tabular-nums', textAlign: 'center', marginBottom: 14, letterSpacing: '0.06em', fontFamily: 'monospace' }}>
               {fmtTime(elapsed)}
             </div>
 
@@ -380,15 +391,28 @@ export default function TaskDetail({ taskId, onBack, userEmail }: Props) {
                 style={{ width: '100%', padding: '10px', borderRadius: 100, border: 'none', background: 'var(--accent)', color: '#fff', fontSize: 13, fontWeight: 700, cursor: timerLoading ? 'not-allowed' : 'pointer', fontFamily: 'var(--font-body)', boxShadow: '0 4px 12px rgba(124,58,237,0.3)', transition: 'all 0.2s' }}>
                 {timerLoading ? '…' : '▶  Start Timer'}
               </button>
-            ) : (
+            ) : paused ? (
+              /* PAUSED STATE */
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                <button onClick={pauseTimer} disabled={timerLoading}
-                  style={{ padding: '10px', borderRadius: 100, border: '1.5px solid rgba(255,255,255,0.2)', background: 'rgba(255,255,255,0.1)', color: '#fff', fontSize: 13, fontWeight: 700, cursor: timerLoading ? 'not-allowed' : 'pointer', fontFamily: 'var(--font-body)', transition: 'all 0.2s' }}>
-                  {timerLoading ? '…' : '⏸  Pause'}
+                <button onClick={resumeTimer}
+                  style={{ padding: '10px', borderRadius: 100, border: 'none', background: 'var(--accent)', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--font-body)', boxShadow: '0 4px 12px rgba(124,58,237,0.4)', transition: 'all 0.2s' }}>
+                  ▶  Resume
                 </button>
                 <button onClick={stopTimer} disabled={timerLoading}
                   style={{ padding: '10px', borderRadius: 100, border: 'none', background: '#EF4444', color: '#fff', fontSize: 13, fontWeight: 700, cursor: timerLoading ? 'not-allowed' : 'pointer', fontFamily: 'var(--font-body)', boxShadow: '0 4px 12px rgba(239,68,68,0.4)', transition: 'all 0.2s' }}>
-                  {timerLoading ? '…' : '⏹  Stop'}
+                  {timerLoading ? '…' : '⏹  Stop & Save'}
+                </button>
+              </div>
+            ) : (
+              /* RUNNING STATE */
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                <button onClick={pauseTimer}
+                  style={{ padding: '10px', borderRadius: 100, border: '1.5px solid rgba(255,255,255,0.2)', background: 'rgba(255,255,255,0.1)', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--font-body)', transition: 'all 0.2s' }}>
+                  ⏸  Pause
+                </button>
+                <button onClick={stopTimer} disabled={timerLoading}
+                  style={{ padding: '10px', borderRadius: 100, border: 'none', background: '#EF4444', color: '#fff', fontSize: 13, fontWeight: 700, cursor: timerLoading ? 'not-allowed' : 'pointer', fontFamily: 'var(--font-body)', boxShadow: '0 4px 12px rgba(239,68,68,0.4)', transition: 'all 0.2s' }}>
+                  {timerLoading ? '…' : '⏹  Stop & Save'}
                 </button>
               </div>
             )}
