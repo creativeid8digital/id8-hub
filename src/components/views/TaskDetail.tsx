@@ -92,6 +92,21 @@ export default function TaskDetail({ taskId, onBack, userEmail }: Props) {
     setTimerLoading(false)
   }
 
+  const pauseTimer = async () => {
+    if (!activeTimer || timerLoading) return
+    setTimerLoading(true)
+    await fetch('/api/time', {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ log_id: activeTimer.id })
+    })
+    setActiveTimer(null)
+    setElapsed(0)
+    const tr = await fetch(`/api/time?task_id=${taskId}`)
+    const td = await tr.json()
+    setTodayLogs(td.todayLogs || [])
+    setTimerLoading(false)
+  }
+
   const stopTimer = async () => {
     if (!activeTimer || timerLoading) return
     setTimerLoading(true)
@@ -101,7 +116,6 @@ export default function TaskDetail({ taskId, onBack, userEmail }: Props) {
     })
     setActiveTimer(null)
     setElapsed(0)
-    // Reload today's logs
     const tr = await fetch(`/api/time?task_id=${taskId}`)
     const td = await tr.json()
     setTodayLogs(td.todayLogs || [])
@@ -352,18 +366,36 @@ export default function TaskDetail({ taskId, onBack, userEmail }: Props) {
           </div>
 
           {/* Time Tracker */}
-          <div style={{ background: activeTimer ? '#1D1D1F' : '#fff', border: `1px solid ${activeTimer ? '#1D1D1F' : 'var(--border-subtle)'}`, borderRadius: 14, padding: '16px', marginBottom: 12, boxShadow: '0 2px 8px rgba(0,0,0,0.05)', transition: 'all 0.3s' }}>
-            <div style={{ fontSize: 12, fontWeight: 700, color: activeTimer ? 'rgba(255,255,255,0.6)' : 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 10 }}>⏱ Time Tracker</div>
-            <div style={{ fontSize: 28, fontWeight: 800, color: activeTimer ? '#fff' : 'var(--text-primary)', fontVariantNumeric: 'tabular-nums', textAlign: 'center', marginBottom: 12, letterSpacing: '0.04em' }}>
+          <div style={{ background: activeTimer ? '#1D1D1F' : '#fff', border: `1px solid ${activeTimer ? 'transparent' : 'var(--border-subtle)'}`, borderRadius: 16, padding: '18px', marginBottom: 12, boxShadow: activeTimer ? '0 8px 32px rgba(0,0,0,0.3)' : '0 2px 8px rgba(0,0,0,0.05)', transition: 'all 0.4s' }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: activeTimer ? 'rgba(255,255,255,0.5)' : 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 12 }}>⏱ Time Tracker</div>
+            
+            {/* Clock */}
+            <div style={{ fontSize: 32, fontWeight: 800, color: activeTimer ? '#fff' : 'var(--text-primary)', fontVariantNumeric: 'tabular-nums', textAlign: 'center', marginBottom: 14, letterSpacing: '0.06em', fontFamily: 'monospace' }}>
               {fmtTime(elapsed)}
             </div>
-            <button onClick={activeTimer ? stopTimer : startTimer} disabled={timerLoading}
-              style={{ width: '100%', padding: '10px', borderRadius: 100, border: 'none', background: activeTimer ? '#EF4444' : 'var(--accent)', color: '#fff', fontSize: 13, fontWeight: 700, cursor: timerLoading ? 'not-allowed' : 'pointer', fontFamily: 'var(--font-body)', transition: 'all 0.2s', boxShadow: activeTimer ? '0 4px 12px rgba(239,68,68,0.4)' : '0 4px 12px rgba(124,58,237,0.3)' }}>
-              {timerLoading ? '…' : activeTimer ? '⏹ Stop Timer' : '▶ Start Timer'}
-            </button>
+
+            {/* Buttons */}
+            {!activeTimer ? (
+              <button onClick={startTimer} disabled={timerLoading}
+                style={{ width: '100%', padding: '10px', borderRadius: 100, border: 'none', background: 'var(--accent)', color: '#fff', fontSize: 13, fontWeight: 700, cursor: timerLoading ? 'not-allowed' : 'pointer', fontFamily: 'var(--font-body)', boxShadow: '0 4px 12px rgba(124,58,237,0.3)', transition: 'all 0.2s' }}>
+                {timerLoading ? '…' : '▶  Start Timer'}
+              </button>
+            ) : (
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                <button onClick={pauseTimer} disabled={timerLoading}
+                  style={{ padding: '10px', borderRadius: 100, border: '1.5px solid rgba(255,255,255,0.2)', background: 'rgba(255,255,255,0.1)', color: '#fff', fontSize: 13, fontWeight: 700, cursor: timerLoading ? 'not-allowed' : 'pointer', fontFamily: 'var(--font-body)', transition: 'all 0.2s' }}>
+                  {timerLoading ? '…' : '⏸  Pause'}
+                </button>
+                <button onClick={stopTimer} disabled={timerLoading}
+                  style={{ padding: '10px', borderRadius: 100, border: 'none', background: '#EF4444', color: '#fff', fontSize: 13, fontWeight: 700, cursor: timerLoading ? 'not-allowed' : 'pointer', fontFamily: 'var(--font-body)', boxShadow: '0 4px 12px rgba(239,68,68,0.4)', transition: 'all 0.2s' }}>
+                  {timerLoading ? '…' : '⏹  Stop'}
+                </button>
+              </div>
+            )}
+
             {todayTotal > 0 && (
-              <div style={{ marginTop: 10, fontSize: 11, color: activeTimer ? 'rgba(255,255,255,0.5)' : 'var(--text-muted)', textAlign: 'center' }}>
-                Today: <strong style={{ color: activeTimer ? 'rgba(255,255,255,0.8)' : 'var(--accent)' }}>{fmtDuration(todayTotal)}</strong> logged on this task
+              <div style={{ marginTop: 12, fontSize: 12, color: activeTimer ? 'rgba(255,255,255,0.5)' : 'var(--text-muted)', textAlign: 'center' }}>
+                Today: <strong style={{ color: activeTimer ? '#fff' : 'var(--accent)' }}>{fmtDuration(todayTotal + elapsed)}</strong> on this task
               </div>
             )}
           </div>

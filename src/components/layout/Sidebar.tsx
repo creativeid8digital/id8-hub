@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react'
 import { signOut } from 'next-auth/react'
 import { supabase, type Brand } from '@/lib/supabase'
 import type { ViewName } from '@/app/dashboard/page'
-import { ListTodo, Calendar, FileText, TrendingUp, CheckCircle, Code2, ChevronDown, ChevronUp, LogOut, Shield, Briefcase, User } from 'lucide-react'
+import { ListTodo, Calendar, TrendingUp, CheckCircle, Code2, ChevronDown, ChevronUp, LogOut, Shield, Briefcase, User, BarChart2 } from 'lucide-react'
 
 // All nav items with role visibility
 const ALL_NAV: { id: ViewName; label: string; icon: any; badge?: string; danger?: boolean; roles: string[] | 'all' }[] = [

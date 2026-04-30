@@ -9,6 +9,7 @@ import PerformanceTracker from '@/components/views/PerformanceTracker'
 import ApprovalsView from '@/components/views/ApprovalsView'
 import DevBoard from '@/components/views/DevBoard'
 import AdminPanel from '@/components/views/AdminPanel'
+import ReportsPanel from '@/components/views/ReportsPanel'
 import BrandManager from '@/components/views/BrandManager'
 import MyTasks from '@/components/views/MyTasks'
 import SearchView from '@/components/views/SearchView'
@@ -17,7 +18,7 @@ import NewJobModal from '@/components/ui/NewJobModal'
 import NotificationBell from '@/components/ui/NotificationBell'
 import { Plus, Search } from 'lucide-react'
 
-export type ViewName = 'tasks' | 'myjobs' | 'calendar' | 'performance' | 'approvals' | 'dev' | 'admin' | 'brands' | 'search'
+export type ViewName = 'tasks' | 'myjobs' | 'calendar' | 'performance' | 'approvals' | 'dev' | 'admin' | 'brands' | 'search' | 'reports'
 export type Brand = { id: string; name: string; color: string; drive_folder_url: string | null; created_at: string }
 
 const ROLE_HOME: Record<string, ViewName> = {
@@ -40,6 +41,7 @@ const VIEW_META: Record<ViewName, { title: string; accent: string; sub: string }
   admin:       { title: 'Admin',       accent: 'Panel',     sub: 'Team management, roles and time reports'         },
   brands:      { title: 'Brand',       accent: 'Manager',   sub: 'Client brands and documents'                     },
   search:      { title: 'Search',      accent: '',          sub: 'Find tasks, briefs and approvals'                },
+  reports:     { title: 'Team',         accent: 'Reports',   sub: 'Task efficiency and time tracking per member'     },
 }
 
 export default function DashboardPage() {
@@ -158,6 +160,7 @@ export default function DashboardPage() {
           {activeView === 'approvals'   && <ApprovalsView     brandId={activeBrand.id} />}
           {activeView === 'dev'         && <DevBoard          brandId={activeBrand.id} />}
           {activeView === 'admin'       && isAdmin && <AdminPanel />}
+          {activeView === 'reports'     && isAdmin && <ReportsPanel />}
           {activeView === 'brands'      && <BrandManager />}
           {activeView === 'search'      && <SearchView        onOpenTask={openTask} />}
         </main>
