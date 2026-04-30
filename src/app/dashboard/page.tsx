@@ -12,6 +12,7 @@ import AdminPanel from '@/components/views/AdminPanel'
 import BrandManager from '@/components/views/BrandManager'
 import MyTasks from '@/components/views/MyTasks'
 import SearchView from '@/components/views/SearchView'
+import TaskDetail from '@/components/views/TaskDetail'
 import NewJobModal from '@/components/ui/NewJobModal'
 import NotificationBell from '@/components/ui/NotificationBell'
 import { Plus, Search } from 'lucide-react'
@@ -19,7 +20,6 @@ import { Plus, Search } from 'lucide-react'
 export type ViewName = 'tasks' | 'myjobs' | 'calendar' | 'performance' | 'approvals' | 'dev' | 'admin' | 'brands' | 'search'
 export type Brand = { id: string; name: string; color: string; drive_folder_url: string | null; created_at: string }
 
-// Role-based default home screen
 const ROLE_HOME: Record<string, ViewName> = {
   am:              'tasks',
   creative_head:   'approvals',
@@ -31,15 +31,15 @@ const ROLE_HOME: Record<string, ViewName> = {
 }
 
 const VIEW_META: Record<ViewName, { title: string; accent: string; sub: string }> = {
-  tasks:       { title: 'Task',          accent: 'Pipeline',  sub: 'All jobs across brands — click any card to open' },
-  myjobs:      { title: 'My',            accent: 'Tasks',     sub: 'Tasks assigned to you'                           },
-  calendar:    { title: 'Social',        accent: 'Calendar',  sub: 'Plan and publish monthly content'                },
-  performance: { title: 'Performance',   accent: 'Tracker',   sub: 'Ad spend, ROAS and campaign metrics'            },
-  approvals:   { title: 'Approvals &',   accent: 'Handoff',   sub: 'Creative Head → AM → Client'                    },
-  dev:         { title: 'Dev',           accent: 'Board',     sub: 'Sprint board for the tech team'                  },
-  admin:       { title: 'Admin',         accent: 'Panel',     sub: 'Team management, roles and time reports'         },
-  brands:      { title: 'Brand',         accent: 'Manager',   sub: 'Client brands and documents'                     },
-  search:      { title: 'Search',        accent: '',          sub: 'Find tasks, briefs and approvals'                },
+  tasks:       { title: 'Task',        accent: 'Pipeline',  sub: 'All jobs across brands — click any card to open' },
+  myjobs:      { title: 'My',          accent: 'Tasks',     sub: 'Tasks assigned to you'                           },
+  calendar:    { title: 'Social',      accent: 'Calendar',  sub: 'Plan and publish monthly content'                },
+  performance: { title: 'Performance', accent: 'Tracker',   sub: 'Ad spend, ROAS and campaign metrics'            },
+  approvals:   { title: 'Approvals &', accent: 'Handoff',   sub: 'Creative Head → AM → Client'                    },
+  dev:         { title: 'Dev',         accent: 'Board',     sub: 'Sprint board for the tech team'                  },
+  admin:       { title: 'Admin',       accent: 'Panel',     sub: 'Team management, roles and time reports'         },
+  brands:      { title: 'Brand',       accent: 'Manager',   sub: 'Client brands and documents'                     },
+  search:      { title: 'Search',      accent: '',          sub: 'Find tasks, briefs and approvals'                },
 }
 
 export default function DashboardPage() {
@@ -52,6 +52,9 @@ export default function DashboardPage() {
   const [agencyRole, setAgencyRole] = useState<string | null>(null)
   const [showNewJob, setShowNewJob] = useState(false)
   const [refreshKey, setRefreshKey] = useState(0)
+  // Global task detail state — any view can open a task detail
+  const [openTaskId, setOpenTaskId] = useState<string | null>(null)
+  const [taskReturnView, setTaskReturnView] = useState<ViewName>('tasks')
 
   useEffect(() => {
     if (status === 'unauthenticated') { router.push('/login'); return }
@@ -60,13 +63,21 @@ export default function DashboardPage() {
         if (!data.onboarding_complete) { router.push('/onboarding'); return }
         setIsAdmin(data.is_admin || false)
         setAgencyRole(data.agency_role || null)
-        // Set role-based home screen
-        const home = ROLE_HOME[data.agency_role] || 'tasks'
-        setActiveView(home)
+        setActiveView(ROLE_HOME[data.agency_role] || 'tasks')
         setChecking(false)
       }).catch(() => setChecking(false))
     }
   }, [status, router])
+
+  const openTask = useCallback((id: string) => {
+    setTaskReturnView(activeView)
+    setOpenTaskId(id)
+  }, [activeView])
+
+  const closeTask = useCallback(() => {
+    setOpenTaskId(null)
+    setRefreshKey(k => k + 1)
+  }, [])
 
   const onJobCreated = useCallback(() => {
     setRefreshKey(k => k + 1)
@@ -89,20 +100,32 @@ export default function DashboardPage() {
   const userId    = (session!.user as any)?.id || ''
   const isAM      = agencyRole === 'am'
 
+  // If a task is open, show TaskDetail over whatever view we're in
+  if (openTaskId) {
+    return (
+      <div style={{ display: 'flex', height: '100vh', overflow: 'hidden', background: 'var(--bg-base)' }}>
+        <Sidebar activeView={activeView} onViewChange={setActiveView} activeBrand={activeBrand} onBrandChange={setActiveBrand} user={session!.user} isAdmin={isAdmin} agencyRole={agencyRole} />
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minWidth: 0 }}>
+          <header style={{ background: '#fff', borderBottom: '1px solid var(--border-subtle)', padding: '0 28px', height: 60, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
+            <div style={{ fontSize: 17, fontWeight: 700, color: 'var(--text-primary)' }}>
+              Task <span style={{ color: 'var(--accent)' }}>Detail</span>
+            </div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              {userId && <NotificationBell userId={userId} />}
+            </div>
+          </header>
+          <main style={{ flex: 1, overflowY: 'auto', padding: '24px 28px', background: 'var(--bg-base)' }}>
+            <TaskDetail taskId={openTaskId} onBack={closeTask} userEmail={userEmail} />
+          </main>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div style={{ display: 'flex', height: '100vh', overflow: 'hidden', background: 'var(--bg-base)' }}>
-      <Sidebar
-        activeView={activeView}
-        onViewChange={setActiveView}
-        activeBrand={activeBrand}
-        onBrandChange={setActiveBrand}
-        user={session!.user}
-        isAdmin={isAdmin}
-        agencyRole={agencyRole}
-      />
-
+      <Sidebar activeView={activeView} onViewChange={v => { setActiveView(v); setOpenTaskId(null) }} activeBrand={activeBrand} onBrandChange={setActiveBrand} user={session!.user} isAdmin={isAdmin} agencyRole={agencyRole} />
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minWidth: 0 }}>
-        {/* Topbar */}
         <header style={{ background: '#fff', borderBottom: '1px solid var(--border-subtle)', padding: '0 28px', height: 60, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
           <div>
             <div style={{ fontSize: 17, fontWeight: 700, color: 'var(--text-primary)', lineHeight: 1 }}>
@@ -112,47 +135,35 @@ export default function DashboardPage() {
               {activeBrand.name !== 'All Brands' ? `${activeBrand.name} · ` : ''}{view.sub}
             </div>
           </div>
-
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-            {/* Search button */}
             <button onClick={() => setActiveView('search')}
-              style={{ width: 36, height: 36, borderRadius: 10, background: activeView === 'search' ? 'var(--accent-subtle)' : '#F5F5F7', border: `1px solid ${activeView === 'search' ? 'var(--accent)' : 'var(--border-subtle)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: 'all 0.15s' }}>
+              style={{ width: 36, height: 36, borderRadius: 10, background: activeView === 'search' ? 'var(--accent-subtle)' : '#F5F5F7', border: `1px solid ${activeView === 'search' ? 'var(--accent)' : 'var(--border-subtle)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
               <Search size={15} color={activeView === 'search' ? 'var(--accent)' : 'var(--text-muted)'} />
             </button>
-
-            {/* Notification bell */}
             {userId && <NotificationBell userId={userId} />}
-
-            {/* New Job button — AMs only */}
             {(isAM || isAdmin) && (
               <button onClick={() => setShowNewJob(true)}
-                style={{ display: 'inline-flex', alignItems: 'center', gap: 7, padding: '9px 20px', borderRadius: 100, background: 'var(--accent)', color: '#fff', border: 'none', fontSize: 13, fontWeight: 700, cursor: 'pointer', boxShadow: '0 4px 14px rgba(124,58,237,0.35)', fontFamily: 'var(--font-body)', transition: 'all 0.2s', letterSpacing: '0.02em' }}>
+                style={{ display: 'inline-flex', alignItems: 'center', gap: 7, padding: '9px 20px', borderRadius: 100, background: 'var(--accent)', color: '#fff', border: 'none', fontSize: 13, fontWeight: 700, cursor: 'pointer', boxShadow: '0 4px 14px rgba(124,58,237,0.35)', fontFamily: 'var(--font-body)' }}>
                 <Plus size={15} strokeWidth={2.5} /> New Job
               </button>
             )}
           </div>
         </header>
 
-        {/* Main content */}
         <main style={{ flex: 1, overflowY: 'auto', padding: '24px 28px', background: 'var(--bg-base)' }}>
-          {activeView === 'tasks'       && <TaskPipeline      key={refreshKey} brandId={activeBrand.id} userEmail={userEmail} />}
-          {activeView === 'myjobs'      && <MyTasks           userEmail={userEmail} onOpenTask={(id) => { setActiveView('tasks') }} />}
+          {activeView === 'tasks'       && <TaskPipeline      key={refreshKey} brandId={activeBrand.id} userEmail={userEmail} onOpenTask={openTask} />}
+          {activeView === 'myjobs'      && <MyTasks           userEmail={userEmail} onOpenTask={openTask} />}
           {activeView === 'calendar'    && <SocialCalendar    brandId={activeBrand.id} />}
           {activeView === 'performance' && <PerformanceTracker brandId={activeBrand.id} />}
           {activeView === 'approvals'   && <ApprovalsView     brandId={activeBrand.id} />}
           {activeView === 'dev'         && <DevBoard          brandId={activeBrand.id} />}
           {activeView === 'admin'       && isAdmin && <AdminPanel />}
           {activeView === 'brands'      && <BrandManager />}
-          {activeView === 'search'      && <SearchView        onOpenTask={(id) => setActiveView('tasks')} />}
+          {activeView === 'search'      && <SearchView        onOpenTask={openTask} />}
         </main>
       </div>
 
-      {/* New Job Modal */}
-      <NewJobModal
-        open={showNewJob}
-        onClose={() => setShowNewJob(false)}
-        onCreated={onJobCreated}
-      />
+      <NewJobModal open={showNewJob} onClose={() => setShowNewJob(false)} onCreated={onJobCreated} />
     </div>
   )
 }

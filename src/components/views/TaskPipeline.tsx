@@ -32,7 +32,7 @@ const PRIORITY_STYLE: Record<string, { color: string; bg: string }> = {
   urgent: { color: '#7C2D12', bg: '#FEF2F2' },
 }
 
-export default function TaskPipeline({ brandId, userEmail }: { brandId: string; userEmail?: string }) {
+export default function TaskPipeline({ brandId, userEmail, onOpenTask }: { brandId: string; userEmail?: string; onOpenTask?: (id: string) => void }) {
   const [tasks, setTasks] = useState<Task[]>([])
   const [loading, setLoading] = useState(true)
   const [filterStatus, setFilterStatus] = useState('all')
