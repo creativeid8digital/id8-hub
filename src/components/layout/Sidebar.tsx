@@ -14,6 +14,7 @@ const ALL_NAV: { id: ViewName; label: string; icon: any; badge?: string; danger?
   { id: 'performance', label: 'Performance',    icon: TrendingUp,   roles: ['am','performance','creative_head'] },
   { id: 'dev',         label: 'Dev Board',      icon: Code2,        roles: ['tech','am','creative_head'] },
   { id: 'brands',      label: 'Brand Manager',  icon: Briefcase,    roles: ['am','creative_head'] },
+  { id: 'reports',     label: 'Team Reports',   icon: BarChart2,    roles: ['admin'] },
   { id: 'admin',       label: 'Admin Panel',    icon: Shield,       roles: ['admin'] },
 ]
 
