@@ -49,6 +49,8 @@ export default function TaskDetail({ taskId, onBack, userEmail }: Props) {
   const [pausedAt, setPausedAt] = useState(0)  // elapsed when paused
   const [todayLogs, setTodayLogs] = useState<any[]>([])
   const [timerLoading, setTimerLoading] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
+  const [submitted, setSubmitted] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -165,6 +167,21 @@ export default function TaskDetail({ taskId, onBack, userEmail }: Props) {
       alert('Upload failed. Please try again.')
     }
     setUploading(false)
+  }
+
+  const submitForReview = async () => {
+    if (!task || submitting) return
+    setSubmitting(true)
+    const res = await fetch('/api/submit', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ task_id: taskId })
+    })
+    if (res.ok) {
+      setSubmitted(true)
+      setTask({ ...task, status: 'in_review' })
+      setEdit({ ...edit, status: 'in_review' })
+    }
+    setSubmitting(false)
   }
 
   const saveTask = async () => {
@@ -290,7 +307,29 @@ export default function TaskDetail({ taskId, onBack, userEmail }: Props) {
               </div>
             </div>
 
-            {nextStatus && (
+            {/* Submit for Review — the main CTA for creative team */}
+            {['assigned','in_progress'].includes(task.status) && (
+              <button onClick={submitForReview} disabled={submitting || submitted}
+                style={{ marginTop: 16, width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '14px', borderRadius: 12, background: submitted ? '#10B981' : 'linear-gradient(135deg, #7C3AED, #9F67F7)', color: '#fff', border: 'none', fontSize: 15, fontWeight: 700, cursor: submitting ? 'not-allowed' : 'pointer', fontFamily: 'var(--font-body)', boxShadow: submitted ? '0 4px 12px rgba(16,185,129,0.4)' : '0 4px 20px rgba(124,58,237,0.4)', transition: 'all 0.3s', letterSpacing: '0.02em' }}>
+                {submitted ? '✅ Submitted for Review!' : submitting ? 'Submitting…' : '🚀 Submit for Review'}
+              </button>
+            )}
+
+            {task.status === 'in_review' && !submitted && (
+              <div style={{ marginTop: 14, padding: '12px 16px', background: '#EFF6FF', borderRadius: 12, border: '1px solid #BFDBFE', display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ fontSize: 16 }}>👀</span>
+                <span style={{ fontSize: 13, fontWeight: 600, color: '#3B82F6' }}>Under review by Creative Head</span>
+              </div>
+            )}
+
+            {task.status === 'approved' && (
+              <div style={{ marginTop: 14, padding: '12px 16px', background: '#ECFDF5', borderRadius: 12, border: '1px solid #A7F3D0', display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ fontSize: 16 }}>🎉</span>
+                <span style={{ fontSize: 13, fontWeight: 700, color: '#10B981' }}>Approved! Great work.</span>
+              </div>
+            )}
+
+            {nextStatus && !['assigned','in_progress'].includes(task.status) && task.status !== 'in_review' && task.status !== 'approved' && (
               <button onClick={advanceStatus}
                 style={{ marginTop:14, display:'inline-flex', alignItems:'center', gap:6, padding:'9px 20px', borderRadius:100, background:st.bg, color:st.color, border:`1.5px solid ${st.color}30`, fontSize:13, fontWeight:700, cursor:'pointer', fontFamily:'var(--font-body)', transition:'all 0.15s' }}>
                 Move to {PIPELINE_LABELS[nextStatus]} →
