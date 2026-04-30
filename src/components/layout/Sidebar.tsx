@@ -9,7 +9,6 @@ import { ListTodo, Calendar, FileText, TrendingUp, CheckCircle, Code2, ChevronDo
 const ALL_NAV: { id: ViewName; label: string; icon: any; badge?: string; danger?: boolean; roles: string[] | 'all' }[] = [
   { id: 'myjobs',      label: 'My Tasks',       icon: User,         roles: ['creative_team','content_writer','publishing_team','performance','tech','creative_head'] },
   { id: 'tasks',       label: 'Task Pipeline',  icon: ListTodo,     roles: 'all' },
-  { id: 'briefs',      label: 'Brief Hub',      icon: FileText,     roles: ['am','creative_head','creative_team','content_writer'] },
   { id: 'calendar',    label: 'Social Calendar',icon: Calendar,     badge: 'May', roles: ['am','publishing_team','content_writer','creative_head'] },
   { id: 'approvals',   label: 'Approvals',      icon: CheckCircle,  badge: '3', danger: true, roles: ['am','creative_head'] },
   { id: 'performance', label: 'Performance',    icon: TrendingUp,   roles: ['am','performance','creative_head'] },

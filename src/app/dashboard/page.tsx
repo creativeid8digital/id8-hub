@@ -5,7 +5,6 @@ import { useEffect, useState, useCallback } from 'react'
 import Sidebar from '@/components/layout/Sidebar'
 import TaskPipeline from '@/components/views/TaskPipeline'
 import SocialCalendar from '@/components/views/SocialCalendar'
-import BriefHub from '@/components/views/BriefHub'
 import PerformanceTracker from '@/components/views/PerformanceTracker'
 import ApprovalsView from '@/components/views/ApprovalsView'
 import DevBoard from '@/components/views/DevBoard'
@@ -17,7 +16,7 @@ import NewJobModal from '@/components/ui/NewJobModal'
 import NotificationBell from '@/components/ui/NotificationBell'
 import { Plus, Search } from 'lucide-react'
 
-export type ViewName = 'tasks' | 'myjobs' | 'calendar' | 'briefs' | 'performance' | 'approvals' | 'dev' | 'admin' | 'brands' | 'search'
+export type ViewName = 'tasks' | 'myjobs' | 'calendar' | 'performance' | 'approvals' | 'dev' | 'admin' | 'brands' | 'search'
 export type Brand = { id: string; name: string; color: string; drive_folder_url: string | null; created_at: string }
 
 // Role-based default home screen
@@ -35,7 +34,6 @@ const VIEW_META: Record<ViewName, { title: string; accent: string; sub: string }
   tasks:       { title: 'Task',          accent: 'Pipeline',  sub: 'All jobs across brands — click any card to open' },
   myjobs:      { title: 'My',            accent: 'Tasks',     sub: 'Tasks assigned to you'                           },
   calendar:    { title: 'Social',        accent: 'Calendar',  sub: 'Plan and publish monthly content'                },
-  briefs:      { title: 'Brief',         accent: 'Hub',       sub: 'All job briefs — read and reference'             },
   performance: { title: 'Performance',   accent: 'Tracker',   sub: 'Ad spend, ROAS and campaign metrics'            },
   approvals:   { title: 'Approvals &',   accent: 'Handoff',   sub: 'Creative Head → AM → Client'                    },
   dev:         { title: 'Dev',           accent: 'Board',     sub: 'Sprint board for the tech team'                  },
@@ -140,7 +138,6 @@ export default function DashboardPage() {
           {activeView === 'tasks'       && <TaskPipeline      key={refreshKey} brandId={activeBrand.id} userEmail={userEmail} />}
           {activeView === 'myjobs'      && <MyTasks           userEmail={userEmail} onOpenTask={(id) => { setActiveView('tasks') }} />}
           {activeView === 'calendar'    && <SocialCalendar    brandId={activeBrand.id} />}
-          {activeView === 'briefs'      && <BriefHub          brandId={activeBrand.id} />}
           {activeView === 'performance' && <PerformanceTracker brandId={activeBrand.id} />}
           {activeView === 'approvals'   && <ApprovalsView     brandId={activeBrand.id} />}
           {activeView === 'dev'         && <DevBoard          brandId={activeBrand.id} />}
