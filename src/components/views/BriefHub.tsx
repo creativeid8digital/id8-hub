@@ -178,14 +178,9 @@ export default function BriefHub({ brandId }: { brandId: string }) {
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
         <div>
           <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--text-primary)' }}>Brief & Asset Hub</div>
-          <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 3 }}>Structured briefs for every campaign — files sync to Google Drive</div>
+          <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 3 }}>All job briefs — read and reference. Create jobs using the "New Job" button.</div>
         </div>
-        <button onClick={() => setView('create')} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, padding: '10px 20px', borderRadius: 100, background: 'var(--accent)', color: '#fff', border: 'none', fontSize: 13, fontWeight: 600, cursor: 'pointer', boxShadow: '0 4px 12px rgba(124,58,237,0.3)', transition: 'all 0.2s' }}
-          onMouseEnter={e => { const el = e.currentTarget as HTMLButtonElement; el.style.transform = 'translateY(-1px)'; el.style.boxShadow = '0 6px 18px rgba(124,58,237,0.4)' }}
-          onMouseLeave={e => { const el = e.currentTarget as HTMLButtonElement; el.style.transform = 'none'; el.style.boxShadow = '0 4px 12px rgba(124,58,237,0.3)' }}
-        >
-          <Plus size={15} strokeWidth={2.5} /> New Brief
-        </button>
+
       </div>
 
       {/* Stats */}
@@ -252,14 +247,7 @@ export default function BriefHub({ brandId }: { brandId: string }) {
             )
           })}
 
-          {/* Add new card */}
-          <div onClick={() => setView('create')} style={{ border: '1.5px dashed var(--border-default)', borderRadius: 18, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: 140, cursor: 'pointer', transition: 'all 0.2s', color: 'var(--text-muted)' }}
-            onMouseEnter={e => { const el = e.currentTarget as HTMLDivElement; el.style.borderColor = 'var(--accent)'; el.style.color = 'var(--accent)'; el.style.background = 'var(--accent-subtle)' }}
-            onMouseLeave={e => { const el = e.currentTarget as HTMLDivElement; el.style.borderColor = 'var(--border-default)'; el.style.color = 'var(--text-muted)'; el.style.background = 'transparent' }}
-          >
-            <Plus size={22} style={{ marginBottom: 6 }} />
-            <div style={{ fontSize: 12, fontWeight: 600 }}>New Brief</div>
-          </div>
+
         </div>
       )}
     </div>
