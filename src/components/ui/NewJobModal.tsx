@@ -189,6 +189,12 @@ export default function NewJobModal({ open, onClose, onCreated }: Props) {
                 ))}
               </div>
 
+              {users.length === 0 && (
+                <div style={{ padding: '10px 14px', background: '#FFFBEB', border: '1px solid #FDE68A', borderRadius: 10, marginBottom: 12, fontSize: 12, color: '#D97706' }}>
+                  ⚠️ No team members yet. Go to <strong>Admin Panel → Copy Invite Link</strong> and share it with your team. They sign in with Google and appear here automatically.
+                </div>
+              )}
+
               <button onClick={() => setDeliverables([...deliverables, { id: uid(), title: '', assigned_to: '', due_date: '' }])}
                 style={{ display: 'inline-flex', alignItems: 'center', gap: 7, padding: '8px 16px', borderRadius: 100, background: 'var(--accent-subtle)', color: 'var(--accent)', border: '1.5px dashed var(--accent)', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font-body)', marginBottom: 24 }}>
                 <Plus size={13} /> Add deliverable

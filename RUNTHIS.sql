@@ -188,3 +188,33 @@ create or replace view monthly_hours_summary as
 -- DONE. All tables, policies and triggers created.
 -- Your existing data (brands, users, briefs) is untouched.
 -- ═══════════════════════════════════════════════════════════════
+
+-- ── APPROVALS: add task_id column for direct linking ─────────────
+alter table approvals add column if not exists task_id uuid references tasks(id) on delete set null;
+
+-- ── SOCIAL POSTS TABLE ───────────────────────────────────────────
+create table if not exists social_posts (
+  id             uuid default gen_random_uuid() primary key,
+  brand_id       uuid references brands(id) on delete cascade,
+  title          text not null,
+  platform       text not null default 'instagram',
+  post_type      text not null default 'reel',
+  scheduled_date date not null,
+  status         text default 'planned',
+  assigned_to    uuid references users(id) on delete set null,
+  drive_file_url text,
+  notes          text,
+  created_at     timestamptz default now(),
+  updated_at     timestamptz default now()
+);
+
+alter table social_posts enable row level security;
+drop policy if exists "Auth read social_posts"   on social_posts;
+drop policy if exists "Auth insert social_posts" on social_posts;
+drop policy if exists "Auth update social_posts" on social_posts;
+create policy "Auth read social_posts"   on social_posts for select using (auth.role() = 'authenticated');
+create policy "Auth insert social_posts" on social_posts for insert with check (auth.role() = 'authenticated');
+create policy "Auth update social_posts" on social_posts for update using (auth.role() = 'authenticated');
+
+-- ── APPROVALS: add task_id if not already added ──────────────────
+alter table approvals add column if not exists task_id uuid references tasks(id) on delete set null;

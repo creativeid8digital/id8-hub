@@ -14,23 +14,22 @@ export async function POST(req: NextRequest) {
 
   const { task_id } = await req.json()
 
-  // Get task details
   const { data: task } = await admin.from('tasks')
     .select('*, brands(name), briefs(title)')
     .eq('id', task_id).single()
   if (!task) return NextResponse.json({ error: 'Task not found' }, { status: 404 })
 
-  // Get submitter
   const { data: submitter } = await admin.from('users')
     .select('id, name').eq('email', session.user.email).single()
 
-  // 1. Move task to in_review
+  // Move task to in_review
   await admin.from('tasks').update({ status: 'in_review' }).eq('id', task_id)
 
-  // 2. Create approval linked to this task
+  // Create approval with task_id stored directly
   const { data: approval } = await admin.from('approvals').insert({
     title: task.title,
     brand_id: task.brand_id,
+    task_id: task_id,  // direct link — no more fragile title matching
     current_stage: 'creative',
     creative_approved: false,
     am_approved: false,
@@ -40,15 +39,12 @@ export async function POST(req: NextRequest) {
   }).select().single()
 
   if (approval) {
-    // 3. Create approval steps
     await admin.from('approval_steps').insert([
       { approval_id: approval.id, step_order: 1, step_name: 'Creative Head Review', assigned_role: 'creative_head', status: 'in_review' },
       { approval_id: approval.id, step_order: 2, step_name: 'Account Manager Check', assigned_role: 'am', status: 'pending' },
     ])
 
-    // 4. Notify all Creative Heads
-    const { data: creativeHeads } = await admin.from('users')
-      .select('id').eq('agency_role', 'creative_head')
+    const { data: creativeHeads } = await admin.from('users').select('id').eq('agency_role', 'creative_head')
     if (creativeHeads && creativeHeads.length > 0) {
       await admin.from('notifications').insert(
         creativeHeads.map(u => ({
