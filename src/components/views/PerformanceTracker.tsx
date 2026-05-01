@@ -100,7 +100,7 @@ export default function PerformanceTracker({ brandId }: { brandId: string }) {
         {[
           { label: 'Total Spend',      value: `₹${(totalSpend/100000).toFixed(1)}L`, color: 'var(--accent)'  },
           { label: 'Avg ROAS',         value: `${avgRoas.toFixed(1)}x`,               color: colorForRoas(avgRoas) },
-          { label: 'Total Impressions',value: totalImpressions > 1e6 ? `${(totalImpressions/1e6).toFixed(1)}M` : `${(totalImpressions/1000).toFixed(0)}K`, color: '#3B82F6' },
+          { label: 'Total Impressions',value: totalImpressions === 0 ? '0' : totalImpressions > 1e6 ? `${(totalImpressions/1e6).toFixed(1)}M` : `${(totalImpressions/1000).toFixed(0)}K`, color: '#3B82F6' },
           { label: 'Total Clicks',     value: totalClicks > 1000 ? `${(totalClicks/1000).toFixed(1)}K` : totalClicks, color: '#10B981' },
         ].map(s => (
           <div key={s.label} style={{ background: '#fff', border: '1px solid var(--border-subtle)', borderRadius: 14, padding: '16px 18px', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
