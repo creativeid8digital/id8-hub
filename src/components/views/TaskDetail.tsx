@@ -51,6 +51,9 @@ export default function TaskDetail({ taskId, onBack, userEmail }: Props) {
   const [timerLoading, setTimerLoading] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [submitted, setSubmitted] = useState(false)
+  const [critiquing, setCritiquing] = useState(false)
+  const [critique, setCritique] = useState<any>(null)
+  const [critiqueError, setCritiqueError] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -167,6 +170,27 @@ export default function TaskDetail({ taskId, onBack, userEmail }: Props) {
       alert('Upload failed. Please try again.')
     }
     setUploading(false)
+  }
+
+  const runAICritique = async () => {
+    if (!task || critiquing) return
+    if (!edit.drive_file_url) {
+      setCritiqueError('Please upload your creative first before running AI critique.')
+      return
+    }
+    setCritiquing(true); setCritiqueError(null); setCritique(null)
+    try {
+      const res = await fetch('/api/ai-critique', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ task_id: taskId })
+      })
+      const data = await res.json()
+      if (data.error) setCritiqueError(data.error)
+      else setCritique(data)
+    } catch (err: any) {
+      setCritiqueError('AI critique failed. Please try again.')
+    }
+    setCritiquing(false)
   }
 
   const submitForReview = async () => {
@@ -286,6 +310,72 @@ export default function TaskDetail({ taskId, onBack, userEmail }: Props) {
                   <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 3 }}>JPG, PNG, PDF, MP4 · Max 50MB</div>
                 </div>
               </label>
+            </div>
+
+            {/* AI Creative Critic */}
+            <div style={{ marginTop: 16, background: '#fff', border: '1.5px solid #C4B5FD', borderRadius: 14, padding: 18 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: 7 }}>
+                    🤖 AI Creative Critic
+                  </div>
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>Get instant feedback before submitting for review</div>
+                </div>
+                <button onClick={runAICritique} disabled={critiquing || !edit.drive_file_url}
+                  style={{ padding: '8px 18px', borderRadius: 100, background: critiquing ? '#C4B5FD' : 'linear-gradient(135deg, #7C3AED, #9F67F7)', color: '#fff', border: 'none', fontSize: 12, fontWeight: 700, cursor: (critiquing || !edit.drive_file_url) ? 'not-allowed' : 'pointer', fontFamily: 'var(--font-body)', opacity: !edit.drive_file_url ? 0.5 : 1, boxShadow: '0 4px 12px rgba(124,58,237,0.3)', whiteSpace: 'nowrap' }}>
+                  {critiquing ? '🔍 Analysing…' : '✨ Run AI Critique'}
+                </button>
+              </div>
+
+              {critiqueError && (
+                <div style={{ fontSize: 12, color: '#EF4444', background: '#FEE2E2', borderRadius: 8, padding: '8px 12px', marginTop: 8 }}>⚠️ {critiqueError}</div>
+              )}
+
+              {critique && (
+                <div>
+                  {/* Score + summary */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', background: critique.can_submit ? '#ECFDF5' : '#FEF2F2', borderRadius: 10, marginBottom: 12, border: `1px solid ${critique.can_submit ? '#A7F3D0' : '#FECACA'}` }}>
+                    <div style={{ fontSize: 28, fontWeight: 800, color: critique.overall_score >= 8 ? '#10B981' : critique.overall_score >= 6 ? '#F59E0B' : '#EF4444', lineHeight: 1 }}>
+                      {critique.overall_score}<span style={{ fontSize: 14, fontWeight: 500, color: 'var(--text-muted)' }}>/10</span>
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>{critique.summary}</div>
+                      {critique.top_fix && <div style={{ fontSize: 11, color: '#EF4444', marginTop: 3, fontWeight: 500 }}>🔧 {critique.top_fix}</div>}
+                    </div>
+                    <div style={{ fontSize: 11, fontWeight: 700, padding: '4px 12px', borderRadius: 100, background: critique.can_submit ? '#10B981' : '#EF4444', color: '#fff' }}>
+                      {critique.can_submit ? '✓ OK to Submit' : '✗ Fix First'}
+                    </div>
+                  </div>
+
+                  {/* Individual checks */}
+                  <div style={{ display: 'grid', gap: 6 }}>
+                    {(critique.checks || []).map((c: any, i: number) => {
+                      const style: Record<string, { icon: string; color: string; bg: string }> = {
+                        pass: { icon: '✅', color: '#10B981', bg: '#ECFDF5' },
+                        warn: { icon: '⚠️', color: '#D97706', bg: '#FFFBEB' },
+                        fail: { icon: '❌', color: '#EF4444', bg: '#FEF2F2' },
+                        info: { icon: 'ℹ️', color: '#3B82F6', bg: '#EFF6FF' },
+                      }
+                      const s = style[c.status] || style.info
+                      return (
+                        <div key={i} style={{ display: 'flex', gap: 10, padding: '8px 12px', borderRadius: 8, background: s.bg, border: `1px solid ${s.color}20` }}>
+                          <span style={{ fontSize: 14, flexShrink: 0 }}>{s.icon}</span>
+                          <div>
+                            <div style={{ fontSize: 11, fontWeight: 700, color: s.color, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 2 }}>{c.check}</div>
+                            <div style={{ fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.5 }}>{c.message}</div>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {!critique && !critiquing && !critiqueError && (
+                <div style={{ fontSize: 12, color: 'var(--text-muted)', textAlign: 'center', padding: '8px 0' }}>
+                  Upload your creative above, then run AI critique to get instant feedback on brand compliance, readability and brief alignment.
+                </div>
+              )}
             </div>
 
             {/* Pipeline progress */}

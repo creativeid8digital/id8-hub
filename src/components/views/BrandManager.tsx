@@ -1,6 +1,7 @@
 'use client'
 import { useEffect, useState, useCallback } from 'react'
-import { Plus, Edit2, Trash2, Folder } from 'lucide-react'
+import { Plus, Edit2, Trash2, Folder, BookOpen } from 'lucide-react'
+import BrandManualBuilder from './BrandManualBuilder'
 
 type Brand = { id: string; name: string; color: string; drive_folder_url: string | null; created_at: string }
 
@@ -20,6 +21,7 @@ export default function BrandManager() {
   const [form, setForm] = useState({ name: '', color: '#7C3AED', drive_folder_url: '' })
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [buildingManual, setBuildingManual] = useState<Brand | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -63,6 +65,8 @@ export default function BrandManager() {
   }
 
   const cancel = () => { setShowCreate(false); setEditingId(null); setForm({ name: '', color: '#7C3AED', drive_folder_url: '' }); setError(null) }
+
+  if (buildingManual) return <BrandManualBuilder brand={buildingManual} onBack={() => setBuildingManual(null)} />
 
   return (
     <div>
@@ -159,6 +163,14 @@ export default function BrandManager() {
                   </div>
                 </div>
                 <div style={{ display: 'flex', gap: 6 }}>
+                  <button onClick={() => setBuildingManual(b)}
+                    title="Brand Manual"
+                    style={{ width: 30, height: 30, borderRadius: 8, background: '#F5F3FF', border: '1px solid #C4B5FD', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: 'all 0.15s' }}
+                    onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.background = 'var(--accent-light)'}
+                    onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.background = '#F5F3FF'}
+                  >
+                    <BookOpen size={13} color="var(--accent)" />
+                  </button>
                   <button onClick={() => startEdit(b)} style={{ width: 30, height: 30, borderRadius: 8, background: '#F5F5F7', border: '1px solid var(--border-subtle)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
                     onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.background = 'var(--accent-light)'}
                     onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.background = '#F5F5F7'}

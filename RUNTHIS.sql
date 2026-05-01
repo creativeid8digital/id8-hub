@@ -218,3 +218,60 @@ create policy "Auth update social_posts" on social_posts for update using (auth.
 
 -- ── APPROVALS: add task_id if not already added ──────────────────
 alter table approvals add column if not exists task_id uuid references tasks(id) on delete set null;
+
+-- ── BRAND MANUAL TABLE ───────────────────────────────────────────
+create table if not exists brand_manual (
+  id                  uuid default gen_random_uuid() primary key,
+  brand_id            uuid references brands(id) on delete cascade unique not null,
+  -- Identity
+  tagline             text,
+  industry            text,
+  founded_year        text,
+  website             text,
+  -- Colours
+  primary_color       text,
+  secondary_color     text,
+  accent_color        text,
+  forbidden_colors    text,
+  -- Typography
+  primary_font        text,
+  secondary_font      text,
+  font_notes          text,
+  -- Voice & Tone
+  tone_words          text[],    -- e.g. ['Bold', 'Inspiring', 'Athletic']
+  anti_tone_words     text[],    -- e.g. ['Casual', 'Playful', 'Weak']
+  brand_voice_notes   text,
+  -- Audience
+  target_age          text,
+  target_gender       text,
+  target_interests    text,
+  target_market       text,
+  -- Platforms
+  active_platforms    text[],    -- e.g. ['instagram', 'linkedin']
+  platform_notes      text,
+  -- Rules
+  dos                 text,
+  donts               text,
+  competitors         text,
+  -- Social links
+  instagram_url       text,
+  linkedin_url        text,
+  twitter_url         text,
+  youtube_url         text,
+  facebook_url        text,
+  -- Logo & References stored as URLs in Supabase Storage
+  logo_url            text,
+  reference_urls      text[],
+  -- Meta
+  completed           bool default false,
+  created_at          timestamptz default now(),
+  updated_at          timestamptz default now()
+);
+
+alter table brand_manual enable row level security;
+drop policy if exists "Auth read brand_manual"   on brand_manual;
+drop policy if exists "Auth insert brand_manual" on brand_manual;
+drop policy if exists "Auth update brand_manual" on brand_manual;
+create policy "Auth read brand_manual"   on brand_manual for select using (auth.role() = 'authenticated');
+create policy "Auth insert brand_manual" on brand_manual for insert with check (auth.role() = 'authenticated');
+create policy "Auth update brand_manual" on brand_manual for update using (auth.role() = 'authenticated');
