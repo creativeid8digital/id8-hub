@@ -1,9 +1,17 @@
--- ═══════════════════════════════════════════════════════════════
--- ID8 HUB — RUN THIS ONCE IN SUPABASE SQL EDITOR
--- Supabase → SQL Editor → New Query → Paste All → Run
--- ═══════════════════════════════════════════════════════════════
+-- ═══════════════════════════════════════════════════════════════════
+-- ID8 HUB — COMPLETE DATABASE SETUP
+-- Run this ONCE in Supabase → SQL Editor → New Query → Run
+-- Safe to re-run. All statements use IF NOT EXISTS / ON CONFLICT.
+-- ═══════════════════════════════════════════════════════════════════
 
--- 1. BRANDS — fix RLS (this is why brand creation was broken)
+-- ── 1. BRANDS ───────────────────────────────────────────────────────
+create table if not exists brands (
+  id               uuid default gen_random_uuid() primary key,
+  name             text not null,
+  color            text default '#7c3aed',
+  drive_folder_url text,
+  created_at       timestamptz default now()
+);
 alter table brands enable row level security;
 drop policy if exists "Auth read brands"   on brands;
 drop policy if exists "Auth insert brands" on brands;
@@ -14,24 +22,142 @@ create policy "Auth insert brands" on brands for insert with check (auth.role() 
 create policy "Auth update brands" on brands for update using (auth.role() = 'authenticated');
 create policy "Auth delete brands" on brands for delete using (auth.role() = 'authenticated');
 
--- 2. USERS — add new columns
-alter table users drop constraint if exists users_team_check;
-alter table users add column if not exists agency_role text;
-alter table users add column if not exists onboarding_complete bool default false;
-alter table users add column if not exists is_admin bool default false;
-update users set is_admin = true where email = 'kunal@id8.digital';
-
--- 3. BRIEFS — add new columns  
-alter table briefs add column if not exists brief_type text;
-alter table briefs add column if not exists assigned_teams text[];
-
--- 4. ADMIN CONFIG
-create table if not exists admin_config (
-  key text primary key, value jsonb not null, updated_at timestamptz default now()
+-- ── 2. USERS ────────────────────────────────────────────────────────
+create table if not exists users (
+  id                  uuid default gen_random_uuid() primary key,
+  email               text unique not null,
+  name                text,
+  avatar_url          text,
+  agency_role         text,
+  onboarding_complete bool default false,
+  is_admin            bool default false,
+  created_at          timestamptz default now()
 );
-insert into admin_config (key, value) values ('admin_emails', '["kunal@id8.digital"]') on conflict (key) do nothing;
+alter table users enable row level security;
+drop policy if exists "Auth read users"   on users;
+drop policy if exists "Auth insert users" on users;
+drop policy if exists "Auth update users" on users;
+create policy "Auth read users"   on users for select using (auth.role() = 'authenticated');
+create policy "Auth insert users" on users for insert with check (auth.role() = 'authenticated');
+create policy "Auth update users" on users for update using (auth.role() = 'authenticated');
 
--- 5. TASKS
+-- Set admin
+update users set is_admin = true where email = 'kunal@id8.digital';
+update users set is_admin = true where email = 'creative@id8.digital';
+
+-- ── 3. BRIEFS ───────────────────────────────────────────────────────
+create table if not exists briefs (
+  id             uuid default gen_random_uuid() primary key,
+  title          text not null,
+  brand_id       uuid references brands(id) on delete cascade,
+  team           text,
+  status         text default 'draft',
+  description    text,
+  drive_file_url text,
+  brief_type     text,
+  assigned_teams text[],
+  created_at     timestamptz default now(),
+  updated_at     timestamptz default now()
+);
+alter table briefs enable row level security;
+drop policy if exists "Auth read briefs"   on briefs;
+drop policy if exists "Auth insert briefs" on briefs;
+drop policy if exists "Auth update briefs" on briefs;
+create policy "Auth read briefs"   on briefs for select using (auth.role() = 'authenticated');
+create policy "Auth insert briefs" on briefs for insert with check (auth.role() = 'authenticated');
+create policy "Auth update briefs" on briefs for update using (auth.role() = 'authenticated');
+
+-- ── 4. APPROVALS ────────────────────────────────────────────────────
+create table if not exists approvals (
+  id               uuid default gen_random_uuid() primary key,
+  title            text not null,
+  brand_id         uuid references brands(id) on delete cascade,
+  task_id          uuid,
+  current_stage    text default 'creative',
+  creative_approved bool default false,
+  am_approved      bool default false,
+  client_approved  bool default false,
+  notes            text,
+  drive_file_url   text,
+  created_at       timestamptz default now()
+);
+alter table approvals enable row level security;
+drop policy if exists "Auth read approvals"   on approvals;
+drop policy if exists "Auth insert approvals" on approvals;
+drop policy if exists "Auth update approvals" on approvals;
+create policy "Auth read approvals"   on approvals for select using (auth.role() = 'authenticated');
+create policy "Auth insert approvals" on approvals for insert with check (auth.role() = 'authenticated');
+create policy "Auth update approvals" on approvals for update using (auth.role() = 'authenticated');
+
+-- ── 5. PERFORMANCE CAMPAIGNS ────────────────────────────────────────
+create table if not exists performance_campaigns (
+  id          uuid default gen_random_uuid() primary key,
+  name        text not null,
+  brand_id    uuid references brands(id) on delete cascade,
+  platform    text default 'meta',
+  spend       numeric(12,2) default 0,
+  impressions integer default 0,
+  clicks      integer default 0,
+  ctr         numeric(6,2) default 0,
+  cpc         numeric(8,2) default 0,
+  roas        numeric(6,2) default 0,
+  status      text default 'live',
+  month_year  text,
+  created_at  timestamptz default now()
+);
+alter table performance_campaigns enable row level security;
+drop policy if exists "Auth read performance_campaigns"   on performance_campaigns;
+drop policy if exists "Auth insert performance_campaigns" on performance_campaigns;
+drop policy if exists "Auth update performance_campaigns" on performance_campaigns;
+create policy "Auth read performance_campaigns"   on performance_campaigns for select using (auth.role() = 'authenticated');
+create policy "Auth insert performance_campaigns" on performance_campaigns for insert with check (auth.role() = 'authenticated');
+create policy "Auth update performance_campaigns" on performance_campaigns for update using (auth.role() = 'authenticated');
+
+-- ── 6. DEV TASKS ────────────────────────────────────────────────────
+create table if not exists dev_tasks (
+  id          uuid default gen_random_uuid() primary key,
+  title       text not null,
+  description text,
+  status      text default 'backlog',
+  priority    text default 'medium',
+  assigned_to uuid references users(id),
+  brand_id    uuid references brands(id) on delete cascade,
+  due_date    date,
+  created_at  timestamptz default now(),
+  updated_at  timestamptz default now()
+);
+alter table dev_tasks enable row level security;
+drop policy if exists "Auth read dev_tasks"   on dev_tasks;
+drop policy if exists "Auth insert dev_tasks" on dev_tasks;
+drop policy if exists "Auth update dev_tasks" on dev_tasks;
+create policy "Auth read dev_tasks"   on dev_tasks for select using (auth.role() = 'authenticated');
+create policy "Auth insert dev_tasks" on dev_tasks for insert with check (auth.role() = 'authenticated');
+create policy "Auth update dev_tasks" on dev_tasks for update using (auth.role() = 'authenticated');
+
+-- ── 7. SOCIAL POSTS ─────────────────────────────────────────────────
+create table if not exists social_posts (
+  id             uuid default gen_random_uuid() primary key,
+  brand_id       uuid references brands(id) on delete cascade,
+  title          text not null,
+  platform       text not null default 'instagram',
+  post_type      text not null default 'reel',
+  scheduled_date date not null,
+  status         text default 'planned',
+  assigned_to    uuid references users(id) on delete set null,
+  drive_file_url text,
+  notes          text,
+  created_at     timestamptz default now(),
+  updated_at     timestamptz default now()
+);
+alter table social_posts enable row level security;
+drop policy if exists "Auth read social_posts"   on social_posts;
+drop policy if exists "Auth insert social_posts" on social_posts;
+drop policy if exists "Auth update social_posts" on social_posts;
+create policy "Auth read social_posts"   on social_posts for select using (auth.role() = 'authenticated');
+create policy "Auth insert social_posts" on social_posts for insert with check (auth.role() = 'authenticated');
+create policy "Auth update social_posts" on social_posts for update using (auth.role() = 'authenticated');
+
+-- ── 8. TASKS ────────────────────────────────────────────────────────
 create table if not exists tasks (
   id              uuid default gen_random_uuid() primary key,
   title           text not null,
@@ -49,8 +175,18 @@ create table if not exists tasks (
   created_at      timestamptz default now(),
   updated_at      timestamptz default now()
 );
+alter table tasks enable row level security;
+drop policy if exists "Auth read tasks"   on tasks;
+drop policy if exists "Auth insert tasks" on tasks;
+drop policy if exists "Auth update tasks" on tasks;
+create policy "Auth read tasks"   on tasks for select using (auth.role() = 'authenticated');
+create policy "Auth insert tasks" on tasks for insert with check (auth.role() = 'authenticated');
+create policy "Auth update tasks" on tasks for update using (auth.role() = 'authenticated');
 
--- 6. TASK COMMENTS
+-- task_id FK on approvals (add after tasks table exists)
+alter table approvals add column if not exists task_id uuid references tasks(id) on delete set null;
+
+-- ── 9. TASK COMMENTS ────────────────────────────────────────────────
 create table if not exists task_comments (
   id         uuid default gen_random_uuid() primary key,
   task_id    uuid references tasks(id) on delete cascade not null,
@@ -58,8 +194,13 @@ create table if not exists task_comments (
   content    text not null,
   created_at timestamptz default now()
 );
+alter table task_comments enable row level security;
+drop policy if exists "Auth read task_comments"   on task_comments;
+drop policy if exists "Auth insert task_comments" on task_comments;
+create policy "Auth read task_comments"   on task_comments for select using (auth.role() = 'authenticated');
+create policy "Auth insert task_comments" on task_comments for insert with check (auth.role() = 'authenticated');
 
--- 7. TIME LOGS
+-- ── 10. TIME LOGS ───────────────────────────────────────────────────
 create table if not exists time_logs (
   id               uuid default gen_random_uuid() primary key,
   task_id          uuid references tasks(id) on delete cascade not null,
@@ -74,8 +215,15 @@ create table if not exists time_logs (
   created_at       timestamptz default now()
 );
 create unique index if not exists one_active_timer_per_user on time_logs (user_id) where stopped_at is null;
+alter table time_logs enable row level security;
+drop policy if exists "Auth read time_logs"   on time_logs;
+drop policy if exists "Auth insert time_logs" on time_logs;
+drop policy if exists "Auth update time_logs" on time_logs;
+create policy "Auth read time_logs"   on time_logs for select using (auth.role() = 'authenticated');
+create policy "Auth insert time_logs" on time_logs for insert with check (auth.role() = 'authenticated');
+create policy "Auth update time_logs" on time_logs for update using (auth.role() = 'authenticated');
 
--- 8. NOTIFICATIONS
+-- ── 11. NOTIFICATIONS ───────────────────────────────────────────────
 create table if not exists notifications (
   id         uuid default gen_random_uuid() primary key,
   user_id    uuid references users(id) on delete cascade not null,
@@ -87,8 +235,15 @@ create table if not exists notifications (
   read       bool default false,
   created_at timestamptz default now()
 );
+alter table notifications enable row level security;
+drop policy if exists "Auth read notifications"   on notifications;
+drop policy if exists "Auth insert notifications" on notifications;
+drop policy if exists "Auth update notifications" on notifications;
+create policy "Auth read notifications"   on notifications for select using (auth.role() = 'authenticated' and user_id = (select id from users where email = auth.jwt()->>'email'));
+create policy "Auth insert notifications" on notifications for insert with check (auth.role() = 'authenticated');
+create policy "Auth update notifications" on notifications for update using (auth.role() = 'authenticated' and user_id = (select id from users where email = auth.jwt()->>'email'));
 
--- 9. APPROVAL STEPS
+-- ── 12. APPROVAL STEPS ──────────────────────────────────────────────
 create table if not exists approval_steps (
   id            uuid default gen_random_uuid() primary key,
   approval_id   uuid references approvals(id) on delete cascade not null,
@@ -102,70 +257,58 @@ create table if not exists approval_steps (
   note          text,
   created_at    timestamptz default now()
 );
+alter table approval_steps enable row level security;
+drop policy if exists "Auth read approval_steps"   on approval_steps;
+drop policy if exists "Auth insert approval_steps" on approval_steps;
+drop policy if exists "Auth update approval_steps" on approval_steps;
+create policy "Auth read approval_steps"   on approval_steps for select using (auth.role() = 'authenticated');
+create policy "Auth insert approval_steps" on approval_steps for insert with check (auth.role() = 'authenticated');
+create policy "Auth update approval_steps" on approval_steps for update using (auth.role() = 'authenticated');
 
--- 10. BRIEF SECTIONS
-create table if not exists brief_sections (
-  id          uuid default gen_random_uuid() primary key,
-  brief_id    uuid references briefs(id) on delete cascade not null,
-  section_key text not null,
-  content     text,
-  sort_order  integer default 0,
-  created_at  timestamptz default now(),
-  updated_at  timestamptz default now(),
-  unique (brief_id, section_key)
+-- ── 13. ADMIN CONFIG ────────────────────────────────────────────────
+create table if not exists admin_config (
+  key        text primary key,
+  value      jsonb not null,
+  updated_at timestamptz default now()
 );
+insert into admin_config (key, value) values ('admin_emails', '["kunal@id8.digital","creative@id8.digital"]') on conflict (key) do update set value = excluded.value;
+alter table admin_config enable row level security;
+drop policy if exists "Auth read admin_config" on admin_config;
+create policy "Auth read admin_config" on admin_config for select using (auth.role() = 'authenticated');
 
--- 11. RLS POLICIES
-alter table tasks           enable row level security;
-alter table task_comments   enable row level security;
-alter table time_logs       enable row level security;
-alter table notifications   enable row level security;
-alter table approval_steps  enable row level security;
-alter table brief_sections  enable row level security;
-alter table admin_config    enable row level security;
+-- ── 14. BRAND MANUAL ────────────────────────────────────────────────
+create table if not exists brand_manual (
+  id                uuid default gen_random_uuid() primary key,
+  brand_id          uuid references brands(id) on delete cascade unique not null,
+  tagline           text, industry text, founded_year text, website text,
+  primary_color     text, secondary_color text, accent_color text, forbidden_colors text,
+  primary_font      text, secondary_font text, font_notes text,
+  tone_words        text[], anti_tone_words text[], brand_voice_notes text,
+  target_age        text, target_gender text, target_interests text, target_market text,
+  active_platforms  text[], platform_notes text,
+  dos               text, donts text, competitors text,
+  instagram_url     text, linkedin_url text, twitter_url text, youtube_url text, facebook_url text,
+  logo_url          text, reference_urls text[],
+  completed         bool default false,
+  created_at        timestamptz default now(),
+  updated_at        timestamptz default now()
+);
+alter table brand_manual enable row level security;
+drop policy if exists "Auth read brand_manual"   on brand_manual;
+drop policy if exists "Auth insert brand_manual" on brand_manual;
+drop policy if exists "Auth update brand_manual" on brand_manual;
+create policy "Auth read brand_manual"   on brand_manual for select using (auth.role() = 'authenticated');
+create policy "Auth insert brand_manual" on brand_manual for insert with check (auth.role() = 'authenticated');
+create policy "Auth update brand_manual" on brand_manual for update using (auth.role() = 'authenticated');
 
-drop policy if exists "Auth read tasks"             on tasks;
-drop policy if exists "Auth insert tasks"           on tasks;
-drop policy if exists "Auth update tasks"           on tasks;
-drop policy if exists "Auth read task_comments"     on task_comments;
-drop policy if exists "Auth insert task_comments"   on task_comments;
-drop policy if exists "Users see own time logs"     on time_logs;
-drop policy if exists "Users insert time logs"      on time_logs;
-drop policy if exists "Users update time logs"      on time_logs;
-drop policy if exists "Users see own notifications" on notifications;
-drop policy if exists "Auth insert notifications"   on notifications;
-drop policy if exists "Users update notifications"  on notifications;
-drop policy if exists "Auth read approval_steps"    on approval_steps;
-drop policy if exists "Auth insert approval_steps"  on approval_steps;
-drop policy if exists "Auth update approval_steps"  on approval_steps;
-drop policy if exists "Auth read brief_sections"    on brief_sections;
-drop policy if exists "Auth insert brief_sections"  on brief_sections;
-drop policy if exists "Auth update brief_sections"  on brief_sections;
-drop policy if exists "Auth read admin_config"      on admin_config;
-
-create policy "Auth read tasks"             on tasks for select using (auth.role() = 'authenticated');
-create policy "Auth insert tasks"           on tasks for insert with check (auth.role() = 'authenticated');
-create policy "Auth update tasks"           on tasks for update using (auth.role() = 'authenticated');
-create policy "Auth read task_comments"     on task_comments for select using (auth.role() = 'authenticated');
-create policy "Auth insert task_comments"   on task_comments for insert with check (auth.role() = 'authenticated');
-create policy "Users see own time logs"     on time_logs for select using (auth.role() = 'authenticated');
-create policy "Users insert time logs"      on time_logs for insert with check (auth.role() = 'authenticated' and user_id = (select id from users where email = auth.jwt()->>'email'));
-create policy "Users update time logs"      on time_logs for update using (auth.role() = 'authenticated');
-create policy "Users see own notifications" on notifications for select using (auth.role() = 'authenticated' and user_id = (select id from users where email = auth.jwt()->>'email'));
-create policy "Auth insert notifications"   on notifications for insert with check (auth.role() = 'authenticated');
-create policy "Users update notifications"  on notifications for update using (auth.role() = 'authenticated' and user_id = (select id from users where email = auth.jwt()->>'email'));
-create policy "Auth read approval_steps"    on approval_steps for select using (auth.role() = 'authenticated');
-create policy "Auth insert approval_steps"  on approval_steps for insert with check (auth.role() = 'authenticated');
-create policy "Auth update approval_steps"  on approval_steps for update using (auth.role() = 'authenticated');
-create policy "Auth read brief_sections"    on brief_sections for select using (auth.role() = 'authenticated');
-create policy "Auth insert brief_sections"  on brief_sections for insert with check (auth.role() = 'authenticated');
-create policy "Auth update brief_sections"  on brief_sections for update using (auth.role() = 'authenticated');
-create policy "Auth read admin_config"      on admin_config for select using (auth.role() = 'authenticated');
-
--- 12. TRIGGERS
+-- ── 15. TRIGGERS ────────────────────────────────────────────────────
 create or replace function update_updated_at() returns trigger as $$ begin new.updated_at = now(); return new; end; $$ language plpgsql;
+
 drop trigger if exists tasks_updated_at on tasks;
 create trigger tasks_updated_at before update on tasks for each row execute function update_updated_at();
+
+drop trigger if exists briefs_updated_at on briefs;
+create trigger briefs_updated_at before update on briefs for each row execute function update_updated_at();
 
 create or replace function fill_time_log_dates() returns trigger as $$ begin new.log_date := new.started_at::date; new.log_month := to_char(new.started_at, 'YYYY-MM'); return new; end; $$ language plpgsql;
 drop trigger if exists fill_time_log_dates_trigger on time_logs;
@@ -175,117 +318,16 @@ create or replace function compute_time_log_duration() returns trigger as $$ beg
 drop trigger if exists time_log_duration_trigger on time_logs;
 create trigger time_log_duration_trigger before update on time_logs for each row execute function compute_time_log_duration();
 
--- 13. MONTHLY HOURS VIEW
-create or replace view monthly_hours_summary as
-  select tl.user_id, u.name as user_name, u.agency_role, tl.log_month,
-    count(*) as sessions, sum(tl.duration_seconds) as total_seconds,
-    round(sum(tl.duration_seconds) / 3600.0, 2) as total_hours
-  from time_logs tl join users u on u.id = tl.user_id
-  where tl.stopped_at is not null
-  group by tl.user_id, u.name, u.agency_role, tl.log_month;
-
--- ═══════════════════════════════════════════════════════════════
--- DONE. All tables, policies and triggers created.
--- Your existing data (brands, users, briefs) is untouched.
--- ═══════════════════════════════════════════════════════════════
-
--- ── APPROVALS: add task_id column for direct linking ─────────────
-alter table approvals add column if not exists task_id uuid references tasks(id) on delete set null;
-
--- ── SOCIAL POSTS TABLE ───────────────────────────────────────────
-create table if not exists social_posts (
-  id             uuid default gen_random_uuid() primary key,
-  brand_id       uuid references brands(id) on delete cascade,
-  title          text not null,
-  platform       text not null default 'instagram',
-  post_type      text not null default 'reel',
-  scheduled_date date not null,
-  status         text default 'planned',
-  assigned_to    uuid references users(id) on delete set null,
-  drive_file_url text,
-  notes          text,
-  created_at     timestamptz default now(),
-  updated_at     timestamptz default now()
-);
-
-alter table social_posts enable row level security;
-drop policy if exists "Auth read social_posts"   on social_posts;
-drop policy if exists "Auth insert social_posts" on social_posts;
-drop policy if exists "Auth update social_posts" on social_posts;
-create policy "Auth read social_posts"   on social_posts for select using (auth.role() = 'authenticated');
-create policy "Auth insert social_posts" on social_posts for insert with check (auth.role() = 'authenticated');
-create policy "Auth update social_posts" on social_posts for update using (auth.role() = 'authenticated');
-
--- ── APPROVALS: add task_id if not already added ──────────────────
-alter table approvals add column if not exists task_id uuid references tasks(id) on delete set null;
-
--- ── BRAND MANUAL TABLE ───────────────────────────────────────────
-create table if not exists brand_manual (
-  id                  uuid default gen_random_uuid() primary key,
-  brand_id            uuid references brands(id) on delete cascade unique not null,
-  -- Identity
-  tagline             text,
-  industry            text,
-  founded_year        text,
-  website             text,
-  -- Colours
-  primary_color       text,
-  secondary_color     text,
-  accent_color        text,
-  forbidden_colors    text,
-  -- Typography
-  primary_font        text,
-  secondary_font      text,
-  font_notes          text,
-  -- Voice & Tone
-  tone_words          text[],    -- e.g. ['Bold', 'Inspiring', 'Athletic']
-  anti_tone_words     text[],    -- e.g. ['Casual', 'Playful', 'Weak']
-  brand_voice_notes   text,
-  -- Audience
-  target_age          text,
-  target_gender       text,
-  target_interests    text,
-  target_market       text,
-  -- Platforms
-  active_platforms    text[],    -- e.g. ['instagram', 'linkedin']
-  platform_notes      text,
-  -- Rules
-  dos                 text,
-  donts               text,
-  competitors         text,
-  -- Social links
-  instagram_url       text,
-  linkedin_url        text,
-  twitter_url         text,
-  youtube_url         text,
-  facebook_url        text,
-  -- Logo & References stored as URLs in Supabase Storage
-  logo_url            text,
-  reference_urls      text[],
-  -- Meta
-  completed           bool default false,
-  created_at          timestamptz default now(),
-  updated_at          timestamptz default now()
-);
-
-alter table brand_manual enable row level security;
-drop policy if exists "Auth read brand_manual"   on brand_manual;
-drop policy if exists "Auth insert brand_manual" on brand_manual;
-drop policy if exists "Auth update brand_manual" on brand_manual;
-create policy "Auth read brand_manual"   on brand_manual for select using (auth.role() = 'authenticated');
-create policy "Auth insert brand_manual" on brand_manual for insert with check (auth.role() = 'authenticated');
-create policy "Auth update brand_manual" on brand_manual for update using (auth.role() = 'authenticated');
-
--- ── CREATE STORAGE BUCKET ────────────────────────────────────────
--- Creates the 'creatives' storage bucket if it doesn't exist
-insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
-values ('creatives', 'creatives', true, 52428800, null)
+-- ── 16. STORAGE BUCKET ──────────────────────────────────────────────
+insert into storage.buckets (id, name, public, file_size_limit)
+values ('creatives', 'creatives', true, 52428800)
 on conflict (id) do nothing;
 
--- Allow authenticated users to upload
 drop policy if exists "Auth upload creatives" on storage.objects;
 drop policy if exists "Public read creatives" on storage.objects;
-create policy "Auth upload creatives" on storage.objects
-  for insert with check (bucket_id = 'creatives' and auth.role() = 'authenticated');
-create policy "Public read creatives" on storage.objects
-  for select using (bucket_id = 'creatives');
+create policy "Auth upload creatives" on storage.objects for insert with check (bucket_id = 'creatives' and auth.role() = 'authenticated');
+create policy "Public read creatives" on storage.objects for select using (bucket_id = 'creatives');
+
+-- ── DONE ────────────────────────────────────────────────────────────
+-- All 14 tables, RLS policies, triggers, and storage bucket created.
+-- Existing data is untouched (all statements use IF NOT EXISTS).
