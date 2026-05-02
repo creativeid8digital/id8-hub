@@ -275,3 +275,17 @@ drop policy if exists "Auth update brand_manual" on brand_manual;
 create policy "Auth read brand_manual"   on brand_manual for select using (auth.role() = 'authenticated');
 create policy "Auth insert brand_manual" on brand_manual for insert with check (auth.role() = 'authenticated');
 create policy "Auth update brand_manual" on brand_manual for update using (auth.role() = 'authenticated');
+
+-- ── CREATE STORAGE BUCKET ────────────────────────────────────────
+-- Creates the 'creatives' storage bucket if it doesn't exist
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values ('creatives', 'creatives', true, 52428800, null)
+on conflict (id) do nothing;
+
+-- Allow authenticated users to upload
+drop policy if exists "Auth upload creatives" on storage.objects;
+drop policy if exists "Public read creatives" on storage.objects;
+create policy "Auth upload creatives" on storage.objects
+  for insert with check (bucket_id = 'creatives' and auth.role() = 'authenticated');
+create policy "Public read creatives" on storage.objects
+  for select using (bucket_id = 'creatives');
