@@ -2,33 +2,20 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import Anthropic from '@anthropic-ai/sdk'
+import { createClient } from '@supabase/supabase-js'
+
+export const maxDuration = 60 // 60s timeout for large PDFs
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! })
+const admin = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+)
 
-export async function POST(req: NextRequest) {
-  const session = await getServerSession(authOptions)
-  if (!session?.user?.email) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
+// Increase body size limit to 20MB
+export const config = { api: { bodyParser: { sizeLimit: '20mb' } } }
 
-  const formData = await req.formData()
-  const file = formData.get('file') as File
-  const docType = formData.get('type') as string || 'brand_guide'
-
-  if (!file) return NextResponse.json({ error: 'No file provided' }, { status: 400 })
-
-  const buffer = await file.arrayBuffer()
-  const base64 = Buffer.from(buffer).toString('base64')
-
-  // Detect actual media type from file
-  const isPDF = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')
-  const isImage = file.type.startsWith('image/') || /\.(jpg|jpeg|png|gif|webp)$/i.test(file.name)
-
-  if (!isPDF && !isImage) {
-    return NextResponse.json({
-      error: 'Please upload a PDF or image file (JPG, PNG, WebP). Word documents are not supported — please convert to PDF first.'
-    }, { status: 400 })
-  }
-
-  const brandPrompt = `This is a brand guide document. Extract ALL brand information you can find.
+const brandPrompt = `This is a brand guide document. Extract ALL brand information you can find.
 Return ONLY valid JSON with this exact structure (use null for missing fields, empty arrays for missing lists):
 {
   "tagline": null,
@@ -60,7 +47,7 @@ Return ONLY valid JSON with this exact structure (use null for missing fields, e
   "facebook_url": null
 }`
 
-  const sopPrompt = `This is an agency SOP or guidelines document. Extract rules and guidelines.
+const sopPrompt = `This is an agency SOP or guidelines document. Extract rules and guidelines.
 Return ONLY valid JSON:
 {
   "dos": null,
@@ -72,9 +59,45 @@ Return ONLY valid JSON:
   "anti_tone_words": []
 }`
 
-  const prompt = docType === 'sop' ? sopPrompt : brandPrompt
+export async function POST(req: NextRequest) {
+  const session = await getServerSession(authOptions)
+  if (!session?.user?.email) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
 
   try {
+    const formData = await req.formData()
+    const file = formData.get('file') as File
+    const docType = (formData.get('type') as string) || 'brand_guide'
+
+    if (!file) return NextResponse.json({ error: 'No file provided' }, { status: 400 })
+
+    // Check file size — Vercel limit is ~4.5MB for serverless
+    const fileSizeMB = file.size / (1024 * 1024)
+    if (fileSizeMB > 15) {
+      return NextResponse.json({
+        error: `File is ${fileSizeMB.toFixed(1)}MB — maximum is 15MB. Please compress the PDF or export just the key pages.`
+      }, { status: 400 })
+    }
+
+    const buffer = await file.arrayBuffer()
+    const base64 = Buffer.from(buffer).toString('base64')
+
+    // Detect file type more permissively
+    const fileName = file.name?.toLowerCase() || ''
+    const mimeType = file.type?.toLowerCase() || ''
+
+    const isPDF = mimeType.includes('pdf') || fileName.endsWith('.pdf')
+    const isImage = mimeType.startsWith('image/') ||
+      fileName.endsWith('.jpg') || fileName.endsWith('.jpeg') ||
+      fileName.endsWith('.png') || fileName.endsWith('.webp')
+
+    if (!isPDF && !isImage) {
+      return NextResponse.json({
+        error: `Unsupported file type "${file.type || fileName}". Please upload a PDF or image (JPG, PNG, WebP). Word docs should be saved as PDF first.`
+      }, { status: 400 })
+    }
+
+    const prompt = docType === 'sop' ? sopPrompt : brandPrompt
+
     let messageContent: any[]
 
     if (isPDF) {
@@ -86,8 +109,7 @@ Return ONLY valid JSON:
         { type: 'text', text: prompt },
       ]
     } else {
-      // Image — use image block
-      const imgMediaType = file.type.startsWith('image/') ? file.type : 'image/jpeg'
+      const imgMediaType = mimeType.startsWith('image/') ? mimeType : 'image/jpeg'
       messageContent = [
         {
           type: 'image',
@@ -110,7 +132,11 @@ Return ONLY valid JSON:
 
     return NextResponse.json({ extracted })
   } catch (err: any) {
-    console.error('Extraction error:', err)
-    return NextResponse.json({ error: err.message || 'Extraction failed' }, { status: 500 })
+    console.error('Extraction error:', err?.message || err)
+    // Return specific error messages
+    if (err?.message?.includes('413') || err?.message?.includes('too large')) {
+      return NextResponse.json({ error: 'PDF too large. Please compress it or extract just the brand guidelines pages (usually 5-10 pages is enough).' }, { status: 400 })
+    }
+    return NextResponse.json({ error: err?.message || 'Extraction failed. Please try a smaller file.' }, { status: 500 })
   }
 }
