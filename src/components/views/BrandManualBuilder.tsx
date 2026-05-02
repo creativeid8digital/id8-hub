@@ -51,7 +51,10 @@ export default function BrandManualBuilder({ brand, onBack }: Props) {
   const [saved, setSaved] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [extracting, setExtracting] = useState(false)
-  const [extractSuccess, setExtractSuccess] = useState(false)
+  const [extractType, setExtractType] = useState<'brand_guide'|'sop'|null>(null)
+  const [extractSuccess, setExtractSuccess] = useState<'brand_guide'|'sop'|null>(null)
+  const [extractError, setExtractError] = useState<string|null>(null)
+  const [extractedFields, setExtractedFields] = useState<string[]>([])
   const [toneInput, setToneInput] = useState('')
   const [antiToneInput, setAntiToneInput] = useState('')
 
@@ -78,51 +81,54 @@ export default function BrandManualBuilder({ brand, onBack }: Props) {
   const removeToneWord = (word: string, field: 'tone_words'|'anti_tone_words') => set(field, ((manual[field]||[]) as string[]).filter(w=>w!==word))
   const togglePlatform = (p: string) => { const pl=manual.active_platforms||[]; set('active_platforms', pl.includes(p)?pl.filter(x=>x!==p):[...pl,p]) }
 
-  // AI extract from PDF
   const extractFromPDF = async (file: File, docType: 'brand_guide'|'sop') => {
-    setExtracting(true); setExtractSuccess(false)
+    setExtracting(true); setExtractType(docType); setExtractSuccess(null); setExtractError(null); setExtractedFields([])
     const formData = new FormData()
     formData.append('file', file)
     formData.append('type', docType)
     try {
       const res = await fetch('/api/extract-brand', { method:'POST', body:formData })
       const data = await res.json()
+      if (data.error) { setExtractError(data.error); setExtracting(false); setExtractType(null); return }
       if (data.extracted) {
         const ex = data.extracted
-        setManual(m => ({
-          ...m,
-          ...(ex.tagline && { tagline:ex.tagline }),
-          ...(ex.industry && { industry:ex.industry }),
-          ...(ex.website && { website:ex.website }),
-          ...(ex.primary_color && { primary_color:ex.primary_color }),
-          ...(ex.secondary_color && { secondary_color:ex.secondary_color }),
-          ...(ex.accent_color && { accent_color:ex.accent_color }),
-          ...(ex.forbidden_colors && { forbidden_colors:ex.forbidden_colors }),
-          ...(ex.primary_font && { primary_font:ex.primary_font }),
-          ...(ex.secondary_font && { secondary_font:ex.secondary_font }),
-          ...(ex.font_notes && { font_notes:ex.font_notes }),
-          ...(ex.tone_words?.length && { tone_words: (m.tone_words||[]).concat(ex.tone_words).filter((v:string,i:number,a:string[])=>a.indexOf(v)===i) }),
-          ...(ex.anti_tone_words?.length && { anti_tone_words: (m.anti_tone_words||[]).concat(ex.anti_tone_words).filter((v:string,i:number,a:string[])=>a.indexOf(v)===i) }),
-          ...(ex.brand_voice_notes && { brand_voice_notes:ex.brand_voice_notes }),
-          ...(ex.target_age && { target_age:ex.target_age }),
-          ...(ex.target_gender && { target_gender:ex.target_gender }),
-          ...(ex.target_interests && { target_interests:ex.target_interests }),
-          ...(ex.target_market && { target_market:ex.target_market }),
-          ...(ex.active_platforms?.length && { active_platforms: (m.active_platforms||[]).concat(ex.active_platforms).filter((v:string,i:number,a:string[])=>a.indexOf(v)===i) }),
-          ...(ex.platform_notes && { platform_notes:ex.platform_notes }),
-          ...(ex.dos && { dos:ex.dos }),
-          ...(ex.donts && { donts:ex.donts }),
-          ...(ex.competitors && { competitors:ex.competitors }),
-          ...(ex.instagram_url && { instagram_url:ex.instagram_url }),
-          ...(ex.linkedin_url && { linkedin_url:ex.linkedin_url }),
-          ...(ex.twitter_url && { twitter_url:ex.twitter_url }),
-          ...(ex.youtube_url && { youtube_url:ex.youtube_url }),
-          ...(ex.facebook_url && { facebook_url:ex.facebook_url }),
-        }))
-        setExtractSuccess(true)
+        const filled: string[] = []
+        setManual(m => {
+          const updates: any = {}
+          const trySet = (field: string, val: any, label: string) => { if (val && (typeof val !== 'object' || val.length)) { updates[field] = val; filled.push(label) } }
+          trySet('tagline', ex.tagline, 'Tagline')
+          trySet('industry', ex.industry, 'Industry')
+          trySet('website', ex.website, 'Website')
+          trySet('primary_color', ex.primary_color, 'Primary colour')
+          trySet('secondary_color', ex.secondary_color, 'Secondary colour')
+          trySet('accent_color', ex.accent_color, 'Accent colour')
+          trySet('forbidden_colors', ex.forbidden_colors, 'Forbidden colours')
+          trySet('primary_font', ex.primary_font, 'Primary font')
+          trySet('secondary_font', ex.secondary_font, 'Secondary font')
+          trySet('font_notes', ex.font_notes, 'Font rules')
+          trySet('brand_voice_notes', ex.brand_voice_notes, 'Brand voice')
+          trySet('target_age', ex.target_age, 'Target age')
+          trySet('target_gender', ex.target_gender, 'Target gender')
+          trySet('target_interests', ex.target_interests, 'Target interests')
+          trySet('target_market', ex.target_market, 'Target market')
+          trySet('platform_notes', ex.platform_notes, 'Platform notes')
+          trySet('dos', ex.dos, 'Dos')
+          trySet('donts', ex.donts, "Don'ts")
+          trySet('competitors', ex.competitors, 'Competitors')
+          trySet('instagram_url', ex.instagram_url, 'Instagram URL')
+          trySet('linkedin_url', ex.linkedin_url, 'LinkedIn URL')
+          if (ex.tone_words?.length) { updates.tone_words = (m.tone_words||[]).concat(ex.tone_words).filter((v:string,i:number,a:string[])=>a.indexOf(v)===i); filled.push('Tone words') }
+          if (ex.anti_tone_words?.length) { updates.anti_tone_words = (m.anti_tone_words||[]).concat(ex.anti_tone_words).filter((v:string,i:number,a:string[])=>a.indexOf(v)===i); filled.push('Anti-tone words') }
+          if (ex.active_platforms?.length) { updates.active_platforms = (m.active_platforms||[]).concat(ex.active_platforms).filter((v:string,i:number,a:string[])=>a.indexOf(v)===i); filled.push('Platforms') }
+          return { ...m, ...updates }
+        })
+        setExtractedFields(filled)
+        setExtractSuccess(docType)
       }
-    } catch(err) { console.error(err) }
-    setExtracting(false)
+    } catch(err: any) {
+      setExtractError('Something went wrong. Please try again or fill manually.')
+    }
+    setExtracting(false); setExtractType(null)
   }
 
   const uploadAsset = async (file: File, type: 'logo'|'reference') => {
@@ -192,12 +198,31 @@ export default function BrandManualBuilder({ brand, onBack }: Props) {
         {/* ── STEP 0: AI AUTO-FILL ── */}
         {step === 0 && (
           <div style={{ display:'grid', gap:20 }}>
-            {extractSuccess && (
-              <div style={{ display:'flex', alignItems:'center', gap:10, padding:'14px 18px', background:'#ECFDF5', borderRadius:12, border:'1px solid #A7F3D0' }}>
-                <span style={{ fontSize:20 }}>✅</span>
+            {extractSuccess && extractedFields.length > 0 && (
+              <div style={{ background:'#ECFDF5', borderRadius:14, border:'1px solid #A7F3D0', padding:'16px 18px' }}>
+                <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:10 }}>
+                  <span style={{ fontSize:20 }}>✅</span>
+                  <div style={{ fontSize:14, fontWeight:700, color:'#10B981' }}>
+                    {extractSuccess === 'brand_guide' ? 'Brand guide scanned!' : 'SOP scanned!'} {extractedFields.length} fields auto-filled
+                  </div>
+                </div>
+                <div style={{ display:'flex', flexWrap:'wrap', gap:6, marginBottom:12 }}>
+                  {extractedFields.map(f => (
+                    <span key={f} style={{ fontSize:11, fontWeight:600, padding:'3px 10px', borderRadius:100, background:'#10B981', color:'#fff' }}>✓ {f}</span>
+                  ))}
+                </div>
+                <div style={{ fontSize:12, color:'#065F46', fontWeight:500 }}>
+                  👉 Click through each step to review and edit what AI extracted. Then save.
+                </div>
+              </div>
+            )}
+
+            {extractError && (
+              <div style={{ background:'#FEF2F2', borderRadius:12, border:'1px solid #FECACA', padding:'14px 16px', display:'flex', gap:10, alignItems:'flex-start' }}>
+                <span style={{ fontSize:18 }}>❌</span>
                 <div>
-                  <div style={{ fontSize:13, fontWeight:700, color:'#10B981' }}>Brand manual auto-filled!</div>
-                  <div style={{ fontSize:12, color:'#065F46' }}>Review each section and make any corrections. Click Next to continue.</div>
+                  <div style={{ fontSize:13, fontWeight:700, color:'#EF4444', marginBottom:4 }}>Extraction failed</div>
+                  <div style={{ fontSize:12, color:'#B91C1C' }}>{extractError}</div>
                 </div>
               </div>
             )}
@@ -217,10 +242,25 @@ export default function BrandManualBuilder({ brand, onBack }: Props) {
               >
                 <input type="file" accept=".pdf,image/*" style={{ display:'none' }} disabled={extracting}
                   onChange={e => e.target.files?.[0] && extractFromPDF(e.target.files[0], 'brand_guide')} />
-                {extracting ? (
-                  <><Sparkles size={18} color="var(--accent)" /><span style={{ fontSize:13, fontWeight:600, color:'var(--accent)' }}>AI is reading your brand guide…</span></>
+                {extracting && extractType === 'brand_guide' ? (
+                  <div style={{ textAlign:'center' }}>
+                    <div style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:8, marginBottom:8 }}>
+                      <Sparkles size={18} color="var(--accent)" />
+                      <span style={{ fontSize:13, fontWeight:700, color:'var(--accent)' }}>AI is reading your brand guide…</span>
+                    </div>
+                    <div style={{ fontSize:11, color:'var(--text-muted)' }}>Extracting colours, fonts, tone, audience, rules…</div>
+                    <div style={{ marginTop:10, height:3, background:'var(--border-default)', borderRadius:100, overflow:'hidden' }}>
+                      <div style={{ height:'100%', width:'60%', background:'var(--accent)', borderRadius:100, animation:'pulse 1.5s infinite' }} />
+                    </div>
+                  </div>
+                ) : extractSuccess === 'brand_guide' ? (
+                  <><span style={{ fontSize:16 }}>✅</span><span style={{ fontSize:13, fontWeight:600, color:'#10B981' }}>Brand guide processed! Upload another to add more data.</span></>
                 ) : (
-                  <><Upload size={16} color="var(--text-muted)" /><span style={{ fontSize:13, fontWeight:500, color:'var(--text-muted)' }}>Upload brand guide PDF or image</span></>
+                  <div style={{ textAlign:'center' }}>
+                    <Upload size={20} color="var(--text-muted)" style={{ marginBottom:8 }} />
+                    <div style={{ fontSize:13, fontWeight:600, color:'var(--text-primary)', marginBottom:4 }}>Upload brand guide PDF or image</div>
+                    <div style={{ fontSize:11, color:'var(--text-muted)' }}>AI will extract colours, fonts, tone, audience & rules automatically</div>
+                  </div>
                 )}
               </label>
             </div>
@@ -240,8 +280,26 @@ export default function BrandManualBuilder({ brand, onBack }: Props) {
               >
                 <input type="file" accept=".pdf,.doc,.docx,image/*" style={{ display:'none' }} disabled={extracting}
                   onChange={e => e.target.files?.[0] && extractFromPDF(e.target.files[0], 'sop')} />
-                <FileText size={16} color="var(--text-muted)" />
-                <span style={{ fontSize:13, fontWeight:500, color:'var(--text-muted)' }}>Upload SOP / guidelines document</span>
+                {extracting && extractType === 'sop' ? (
+                  <div style={{ textAlign:'center' }}>
+                    <div style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:8, marginBottom:8 }}>
+                      <Sparkles size={18} color="#F59E0B" />
+                      <span style={{ fontSize:13, fontWeight:700, color:'#D97706' }}>AI is reading your SOP…</span>
+                    </div>
+                    <div style={{ fontSize:11, color:'var(--text-muted)' }}>Extracting dos, don'ts and guidelines…</div>
+                    <div style={{ marginTop:10, height:3, background:'var(--border-default)', borderRadius:100, overflow:'hidden' }}>
+                      <div style={{ height:'100%', width:'60%', background:'#F59E0B', borderRadius:100 }} />
+                    </div>
+                  </div>
+                ) : extractSuccess === 'sop' ? (
+                  <><span style={{ fontSize:16 }}>✅</span><span style={{ fontSize:13, fontWeight:600, color:'#10B981' }}>SOP processed! Upload another to add more rules.</span></>
+                ) : (
+                  <div style={{ textAlign:'center' }}>
+                    <FileText size={20} color="var(--text-muted)" style={{ marginBottom:8 }} />
+                    <div style={{ fontSize:13, fontWeight:600, color:'var(--text-primary)', marginBottom:4 }}>Upload SOP / internal guidelines</div>
+                    <div style={{ fontSize:11, color:'var(--text-muted)' }}>AI extracts dos, don'ts and brand rules automatically</div>
+                  </div>
+                )}
               </label>
             </div>
 
