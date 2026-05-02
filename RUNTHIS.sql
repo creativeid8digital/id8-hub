@@ -273,8 +273,12 @@ create table if not exists admin_config (
 );
 insert into admin_config (key, value) values ('admin_emails', '["kunal@id8.digital","creative@id8.digital"]') on conflict (key) do update set value = excluded.value;
 alter table admin_config enable row level security;
-drop policy if exists "Auth read admin_config" on admin_config;
-create policy "Auth read admin_config" on admin_config for select using (auth.role() = 'authenticated');
+drop policy if exists "Auth read admin_config"   on admin_config;
+drop policy if exists "Auth insert admin_config" on admin_config;
+drop policy if exists "Auth update admin_config" on admin_config;
+create policy "Auth read admin_config"   on admin_config for select using (auth.role() = 'authenticated');
+create policy "Auth insert admin_config" on admin_config for insert with check (auth.role() = 'authenticated');
+create policy "Auth update admin_config" on admin_config for update using (auth.role() = 'authenticated');
 
 -- ── 14. BRAND MANUAL ────────────────────────────────────────────────
 create table if not exists brand_manual (
